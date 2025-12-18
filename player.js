@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         name: '',
         players: [],
         lastNumber: null,
-        extractedNumbers: [],
+        extractedCount: 0,
         winHistory: []
     };
     
@@ -54,13 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('player-left', handlePlayerLeft);
     socket.on('number-extracted', handleNumberExtracted);
     socket.on('player-won', handlePlayerWon);
-    socket.on('player-cinquina', handlePlayerCinquina);
     socket.on('win-detected', handleWinDetected);
     socket.on('extraction-reset', handleExtractionReset);
     socket.on('mark-error', handleMarkError);
-    
-    // Inizializza il tabellone
-    initTombolaBoard();
     
     // Funzione per unirsi a una stanza
     async function joinRoom() {
@@ -117,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
         room.name = data.roomName;
         room.players = data.players;
         room.lastNumber = data.lastNumber;
-        room.extractedNumbers = data.extractedNumbers || [];
+        room.extractedCount = data.extractedCount || 0;
         room.winHistory = data.winHistory || [];
         
         // Salva le cartelle dal server
@@ -132,9 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Aggiorna le informazioni
         updateRoomInfo();
-        
-        // Aggiorna il tabellone con i numeri già estratti
-        updateTombolaBoard();
         
         // Aggiorna storico vincite
         updateWinHistory();
@@ -163,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: '',
                 players: [],
                 lastNumber: null,
-                extractedNumbers: [],
+                extractedCount: 0,
                 winHistory: []
             };
             
@@ -198,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestione numero estratto
     function handleNumberExtracted(data) {
         room.lastNumber = data.number;
-        room.extractedNumbers = data.extractedNumbers || [];
+        room.extractedCount = data.extractedCount || 0;
         
         // Aggiorna il numero visualizzato
         const numberDisplay = document.getElementById('last-number-display');
@@ -213,11 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aggiorna conteggio numeri estratti
         document.getElementById('extracted-count-display').textContent = data.extractedCount;
         
-        // Aggiorna il tabellone
-        updateTombolaBoard();
-        
         // Aggiorna le cartelle - i numeri vengono segnati automaticamente dal server
-        // Qui aggiorniamo solo la visualizzazione
         updateAllCardsDisplay();
         
         showMessage(`Numero ${data.number} estratto!`, 'info');
@@ -226,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestione reset estrazione
     function handleExtractionReset() {
         room.lastNumber = null;
-        room.extractedNumbers = [];
+        room.extractedCount = 0;
         room.winHistory = [];
         
         // Reset cartelle
@@ -235,7 +224,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         updateRoomInfo();
-        updateTombolaBoard();
         updateWinHistory();
         generatePlayerCards(); // Rigenera le cartelle visive
         showMessage('Estrazione resettata dall\'amministratore', 'info');
@@ -264,36 +252,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Gestione cinquina di altri giocatori
-    function handlePlayerCinquina(data) {
-        if (data.playerName !== player.name) {
-            showMessage(`🎉 ${data.playerName} ha fatto CINQUINA!`, 'info');
-        }
-    }
-    
-    // Gestione rilevamento vincite
+    // Gestione rilevamento vincite (ambo/terna/quaterna/cinquina)
     function handleWinDetected(data) {
         // Aggiungi allo storico
         room.winHistory.push(data);
         updateWinHistory();
         
-        const winMessages = {
-            'ambo': 'Ambo! 2 numeri su una riga!',
-            'terna': 'Terna! 3 numeri su una riga!',
-            'quaterna': 'Quaterna! 4 numeri su una riga!',
-            'cinquina': 'CINQUINA! Riga completata!'
+        const winNames = {
+            'ambo': 'AMBO',
+            'terna': 'TERNA',
+            'quaterna': 'QUATERNA',
+            'cinquina': 'CINQUINA'
         };
         
-        if (winMessages[data.type]) {
-            if (data.playerName === player.name) {
-                const message = `🎉 HAI FATTO ${data.type.toUpperCase()}! Cartella ${data.cardIndex + 1}, Riga ${data.rowIndex + 1}`;
-                showMessage(message, 'success');
-                
-                // Evidenzia la riga vincente
-                highlightWinningRow(data.cardIndex, data.rowIndex, data.type);
-            } else {
-                showMessage(`🎉 ${data.playerName} ha fatto ${data.type.toUpperCase()}!`, 'info');
-            }
+        if (data.playerName === player.name) {
+            const message = `🎉 HAI FATTO ${winNames[data.type]}! Cartella ${data.cardIndex + 1}, Riga ${data.rowIndex + 1}`;
+            showMessage(message, 'success');
+            
+            // Evidenzia la riga vincente
+            highlightWinningRow(data.cardIndex, data.rowIndex, data.type);
+        } else {
+            showMessage(`🎉 ${data.playerName} ha fatto ${winNames[data.type]}!`, 'info');
         }
     }
     
@@ -391,46 +370,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (message) {
             showMessage(message, 'success');
         } else {
-            showMessage(`Hai segnato ${totalMarked} numeri su ${15 * player.cardsCount}`, 'info');
+            showMessage(`Hai segnato ${totalMarked} numeri su ${15 * player.cardsCount}. Continua così!`, 'info');
         }
-    }
-    
-    // Inizializza il tabellone dei numeri
-    function initTombolaBoard() {
-        const grid = document.getElementById('tombola-board-grid');
-        if (!grid) return;
-        
-        grid.innerHTML = '';
-        
-        for (let i = 1; i <= 90; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'simple-cell';
-            cell.id = `board-number-${i}`;
-            cell.textContent = i;
-            grid.appendChild(cell);
-        }
-    }
-    
-    // Aggiorna il tabellone
-    function updateTombolaBoard() {
-        for (let i = 1; i <= 90; i++) {
-            const cell = document.getElementById(`board-number-${i}`);
-            if (cell) {
-                if (room.extractedNumbers.includes(i)) {
-                    cell.classList.add('extracted');
-                    if (i === room.lastNumber) {
-                        cell.classList.add('just-extracted');
-                        setTimeout(() => {
-                            cell.classList.remove('just-extracted');
-                        }, 2000);
-                    }
-                } else {
-                    cell.classList.remove('extracted', 'just-extracted');
-                }
-            }
-        }
-        
-        document.getElementById('extracted-count-display').textContent = room.extractedNumbers.length;
     }
     
     // Aggiorna storico vincite
@@ -457,10 +398,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const time = win.timestamp ? new Date(win.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Ora';
             let winText = '';
             
+            const winNames = {
+                'ambo': 'AMBO',
+                'terna': 'TERNA',
+                'quaterna': 'QUATERNA',
+                'cinquina': 'CINQUINA',
+                'tombola': 'TOMBOLA'
+            };
+            
             if (win.type === 'tombola') {
-                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-tombola">TOMBOLA</span>!`;
+                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-tombola">${winNames[win.type]}</span>!`;
             } else {
-                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-${win.type}">${win.type.toUpperCase()}</span>`;
+                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-${win.type}">${winNames[win.type]}</span>`;
                 if (win.cardIndex !== undefined && win.rowIndex !== undefined) {
                     winText += ` (Cartella ${win.cardIndex + 1}, Riga ${win.rowIndex + 1})`;
                 }
@@ -591,10 +540,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (e.detail === 1) {
                             clearTimeout(clickTimer);
                             clickTimer = setTimeout(() => {
-                                if (room.extractedNumbers.includes(cellData.number)) {
-                                    showMessage(`Numero ${cellData.number} già estratto!`, 'info');
+                                // Non possiamo sapere se il numero è stato estratto
+                                // senza conoscere tutti i numeri estratti
+                                if (cellData.marked) {
+                                    showMessage(`Numero ${cellData.number} già segnato`, 'info');
                                 } else {
-                                    showMessage(`Numero ${cellData.number} non ancora estratto`, 'info');
+                                    showMessage(`Numero ${cellData.number} non ancora segnato`, 'info');
                                 }
                             }, 300);
                         }
@@ -621,37 +572,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function markNumberManual(cardIndex, number) {
         if (!player.isConnected) return;
         
-        // Verifica che il numero sia stato estratto
-        if (!room.extractedNumbers.includes(number)) {
-            showMessage('Questo numero non è ancora stato estratto!', 'error');
-            return;
-        }
-        
-        // Invia al server
+        // Non possiamo verificare se il numero è stato estratto
+        // perché non abbiamo la lista completa
+        // Quindi inviamo comunque la richiesta al server
         socket.emit('mark-number-manual', {
             roomCode: player.roomCode,
             cardIndex: cardIndex,
             number: number
         });
         
-        // Aggiorna localmente
-        const cell = document.getElementById(`card-${cardIndex}-num-${number}`);
-        if (cell && !cell.classList.contains('marked')) {
-            cell.classList.add('marked');
-            
-            // Trova il numero nella struttura dati
-            const card = player.cards[cardIndex];
-            card.numbers.forEach(numObj => {
-                if (numObj.number === number) {
-                    numObj.marked = true;
-                }
-            });
-            
-            // Aggiorna conteggi
-            updateCardCount(cardIndex);
-            
-            showMessage(`Numero ${number} segnato manualmente!`, 'success');
-        }
+        // Mostra messaggio
+        showMessage(`Richiesta di segnare il numero ${number} inviata...`, 'info');
     }
     
     // Funzione per aggiungere i contatori per riga
@@ -698,6 +629,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (cellData && cellData.marked) {
                         totalMarked++;
                         rowCounts[row]++;
+                        
+                        // Aggiorna visualizzazione cella
+                        const cell = document.getElementById(`card-${cardIndex}-num-${cellData.number}`);
+                        if (cell && !cell.classList.contains('marked')) {
+                            cell.classList.add('marked');
+                        }
                     }
                 }
             }
@@ -745,6 +682,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (playerNameDisplay) playerNameDisplay.textContent = player.name;
         if (roomPlayersDisplay) roomPlayersDisplay.textContent = room.players.length;
         if (lastNumberDisplay) lastNumberDisplay.textContent = room.lastNumber || '--';
+        
+        // Aggiorna conteggio numeri estratti
+        const extractedCountDisplay = document.getElementById('extracted-count-display');
+        if (extractedCountDisplay) {
+            extractedCountDisplay.textContent = room.extractedCount;
+        }
     }
     
     // Funzione per mostrare messaggi
@@ -813,24 +756,19 @@ document.addEventListener('DOMContentLoaded', function() {
             color: white;
         }
         
-        .simple-cell.extracted {
-            background: #d40000;
+        .card-complete::before {
+            content: '🎉 TOMBOLA!';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff0000;
             color: white;
-        }
-        
-        .simple-cell.just-extracted {
-            animation: flash 1s ease-in-out infinite;
-        }
-        
-        @keyframes flash {
-            0%, 100% { 
-                background: #d40000;
-                box-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
-            }
-            50% { 
-                background: #ffcc00;
-                box-shadow: 0 0 20px rgba(255, 204, 0, 1);
-            }
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            z-index: 10;
         }
     `;
     document.head.appendChild(style);
