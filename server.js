@@ -30,6 +30,24 @@ function generateId(length = 6) {
 }
 
 // Route per le pagine
+
+// Aggiungi questa route al server.js esistente
+
+// API per ottenere stanze attive
+app.get('/api/active-rooms', (req, res) => {
+    const activeRooms = Array.from(rooms.values())
+        .filter(room => room.isActive && room.players.size > 0)
+        .map(room => ({
+            id: room.id,
+            name: room.name,
+            players: room.players.size,
+            maxPlayers: room.maxPlayers,
+            createdAt: room.createdAt
+        }));
+    
+    res.json(activeRooms);
+});
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
