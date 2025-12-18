@@ -16,7 +16,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let room = {
         name: '',
         players: [],
-        lastNumber: null
+        lastNumber: null,
+        extractedNumbers: [],
+        winHistory: []
     };
     
     // Elementi DOM
@@ -55,6 +57,10 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('player-cinquina', handlePlayerCinquina);
     socket.on('win-detected', handleWinDetected);
     socket.on('extraction-reset', handleExtractionReset);
+    socket.on('mark-error', handleMarkError);
+    
+    // Inizializza il tabellone
+    initTombolaBoard();
     
     // Funzione per unirsi a una stanza
     async function joinRoom() {
@@ -111,6 +117,8 @@ document.addEventListener('DOMContentLoaded', function() {
         room.name = data.roomName;
         room.players = data.players;
         room.lastNumber = data.lastNumber;
+        room.extractedNumbers = data.extractedNumbers || [];
+        room.winHistory = data.winHistory || [];
         
         // Salva le cartelle dal server
         player.cards = data.cards || [];
@@ -124,6 +132,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Aggiorna le informazioni
         updateRoomInfo();
+        
+        // Aggiorna il tabellone con i numeri già estratti
+        updateTombolaBoard();
+        
+        // Aggiorna storico vincite
+        updateWinHistory();
+        
+        // Aggiorna lista giocatori
+        updatePlayersList();
         
         // Genera le cartelle visuali
         generatePlayerCards();
@@ -145,7 +162,9 @@ document.addEventListener('DOMContentLoaded', function() {
             room = {
                 name: '',
                 players: [],
-                lastNumber: null
+                lastNumber: null,
+                extractedNumbers: [],
+                winHistory: []
             };
             
             gameSection.style.display = 'none';
@@ -167,18 +186,19 @@ document.addEventListener('DOMContentLoaded', function() {
             markedCount: 0
         });
         
-        updateRoomInfo();
+        updatePlayersList();
     }
     
     // Gestione giocatore uscito
     function handlePlayerLeft(data) {
         room.players = room.players.filter(p => p.id !== data.playerId);
-        updateRoomInfo();
+        updatePlayersList();
     }
     
     // Gestione numero estratto
     function handleNumberExtracted(data) {
         room.lastNumber = data.number;
+        room.extractedNumbers = data.extractedNumbers || [];
         
         // Aggiorna il numero visualizzato
         const numberDisplay = document.getElementById('last-number-display');
@@ -190,6 +210,12 @@ document.addEventListener('DOMContentLoaded', function() {
             numberDisplay.style.animation = '';
         }, 1000);
         
+        // Aggiorna conteggio numeri estratti
+        document.getElementById('extracted-count-display').textContent = data.extractedCount;
+        
+        // Aggiorna il tabellone
+        updateTombolaBoard();
+        
         // Aggiorna le cartelle - i numeri vengono segnati automaticamente dal server
         // Qui aggiorniamo solo la visualizzazione
         updateAllCardsDisplay();
@@ -200,6 +226,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestione reset estrazione
     function handleExtractionReset() {
         room.lastNumber = null;
+        room.extractedNumbers = [];
+        room.winHistory = [];
         
         // Reset cartelle
         player.cards.forEach(card => {
@@ -207,12 +235,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         updateRoomInfo();
+        updateTombolaBoard();
+        updateWinHistory();
         generatePlayerCards(); // Rigenera le cartelle visive
         showMessage('Estrazione resettata dall\'amministratore', 'info');
     }
     
-    // Gestione vincita di un giocatore
+    // Gestione vincita TOMBOLA
     function handlePlayerWon(data) {
+        // Aggiungi allo storico
+        room.winHistory.push(data);
+        updateWinHistory();
+        
         if (data.playerName === player.name) {
             showMessage(`🎉 COMPLIMENTI! HAI FATTO TOMBOLA! Cartella ${data.cardIndex + 1} completata! 🎉`, 'success');
             
@@ -220,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const cardElement = document.querySelector(`#card-${data.cardIndex}`).closest('.tombola-card');
             if (cardElement) {
                 cardElement.classList.add('card-complete');
-                cardElement.style.animation = 'pulse 1s infinite';
+                cardElement.style.animation = 'tombola-pulse 1s infinite';
                 setTimeout(() => {
                     cardElement.style.animation = '';
                 }, 5000);
@@ -239,6 +273,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestione rilevamento vincite
     function handleWinDetected(data) {
+        // Aggiungi allo storico
+        room.winHistory.push(data);
+        updateWinHistory();
+        
         const winMessages = {
             'ambo': 'Ambo! 2 numeri su una riga!',
             'terna': 'Terna! 3 numeri su una riga!',
@@ -247,15 +285,21 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         if (winMessages[data.type]) {
-            const message = data.type === 'cinquina' && data.playerName === player.name 
-                ? `🎉 HAI FATTO ${winMessages[data.type].toUpperCase()}!` 
-                : `🎉 ${winMessages[data.type]}`;
-            
-            showMessage(message, 'success');
-            
-            // Evidenzia la riga vincente
-            highlightWinningRow(data.cardIndex, data.row, data.type);
+            if (data.playerName === player.name) {
+                const message = `🎉 HAI FATTO ${data.type.toUpperCase()}! Cartella ${data.cardIndex + 1}, Riga ${data.rowIndex + 1}`;
+                showMessage(message, 'success');
+                
+                // Evidenzia la riga vincente
+                highlightWinningRow(data.cardIndex, data.rowIndex, data.type);
+            } else {
+                showMessage(`🎉 ${data.playerName} ha fatto ${data.type.toUpperCase()}!`, 'info');
+            }
         }
+    }
+    
+    // Gestione errore segnatura
+    function handleMarkError(error) {
+        showMessage(error, 'error');
     }
     
     // Funzione per evidenziare la riga vincente
@@ -329,19 +373,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (wins.cinquina.length > 0) {
-            message += `🎯 Cinquina: ${wins.cinquina.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+            message += `🎯 Cinquina: ${wins.cinquina.map(w => `Cartella ${w.card}, Riga ${w.row}`).join(', ')}\n`;
         }
         
         if (wins.quaterna.length > 0) {
-            message += `⭐ Quaterna: ${wins.quaterna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+            message += `⭐ Quaterna: ${wins.quaterna.map(w => `Cartella ${w.card}, Riga ${w.row}`).join(', ')}\n`;
         }
         
         if (wins.terna.length > 0) {
-            message += `🔶 Terna: ${wins.terna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+            message += `🔶 Terna: ${wins.terna.map(w => `Cartella ${w.card}, Riga ${w.row}`).join(', ')}\n`;
         }
         
         if (wins.ambo.length > 0) {
-            message += `🔹 Ambo: ${wins.ambo.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+            message += `🔹 Ambo: ${wins.ambo.map(w => `Cartella ${w.card}, Riga ${w.row}`).join(', ')}\n`;
         }
         
         if (message) {
@@ -349,6 +393,128 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             showMessage(`Hai segnato ${totalMarked} numeri su ${15 * player.cardsCount}`, 'info');
         }
+    }
+    
+    // Inizializza il tabellone dei numeri
+    function initTombolaBoard() {
+        const grid = document.getElementById('tombola-board-grid');
+        if (!grid) return;
+        
+        grid.innerHTML = '';
+        
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'simple-cell';
+            cell.id = `board-number-${i}`;
+            cell.textContent = i;
+            grid.appendChild(cell);
+        }
+    }
+    
+    // Aggiorna il tabellone
+    function updateTombolaBoard() {
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.getElementById(`board-number-${i}`);
+            if (cell) {
+                if (room.extractedNumbers.includes(i)) {
+                    cell.classList.add('extracted');
+                    if (i === room.lastNumber) {
+                        cell.classList.add('just-extracted');
+                        setTimeout(() => {
+                            cell.classList.remove('just-extracted');
+                        }, 2000);
+                    }
+                } else {
+                    cell.classList.remove('extracted', 'just-extracted');
+                }
+            }
+        }
+        
+        document.getElementById('extracted-count-display').textContent = room.extractedNumbers.length;
+    }
+    
+    // Aggiorna storico vincite
+    function updateWinHistory() {
+        const winsList = document.getElementById('wins-history-list');
+        if (!winsList) return;
+        
+        if (room.winHistory.length === 0) {
+            winsList.innerHTML = '<p style="color: #c9e4c5; text-align: center; font-style: italic;">Ancora nessuna vincita...</p>';
+            return;
+        }
+        
+        // Ordina per timestamp (più recenti prima)
+        const sortedWins = [...room.winHistory].sort((a, b) => {
+            return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        });
+        
+        winsList.innerHTML = '';
+        
+        sortedWins.slice(0, 20).forEach(win => {
+            const winItem = document.createElement('div');
+            winItem.className = `win-item ${win.type}`;
+            
+            const time = win.timestamp ? new Date(win.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Ora';
+            let winText = '';
+            
+            if (win.type === 'tombola') {
+                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-tombola">TOMBOLA</span>!`;
+            } else {
+                winText = `<span class="win-player">${win.playerName}</span> ha fatto <span class="win-type win-${win.type}">${win.type.toUpperCase()}</span>`;
+                if (win.cardIndex !== undefined && win.rowIndex !== undefined) {
+                    winText += ` (Cartella ${win.cardIndex + 1}, Riga ${win.rowIndex + 1})`;
+                }
+            }
+            
+            winItem.innerHTML = `
+                <div style="font-size: 0.9rem; color: #c9e4c5; margin-bottom: 3px;">${time}</div>
+                <div>${winText}</div>
+            `;
+            
+            winsList.appendChild(winItem);
+        });
+    }
+    
+    // Aggiorna lista giocatori
+    function updatePlayersList() {
+        const playersList = document.getElementById('players-list');
+        const playersCount = document.getElementById('players-count');
+        
+        if (!playersList) return;
+        
+        if (room.players.length === 0) {
+            playersList.innerHTML = '<p style="color: #c9e4c5; text-align: center;">Nessun giocatore</p>';
+            if (playersCount) playersCount.textContent = '0';
+            return;
+        }
+        
+        playersList.innerHTML = '';
+        if (playersCount) playersCount.textContent = room.players.length;
+        
+        room.players.forEach(p => {
+            const playerItem = document.createElement('div');
+            playerItem.style.padding = '10px';
+            playerItem.style.marginBottom = '8px';
+            playerItem.style.background = 'rgba(255,255,255,0.05)';
+            playerItem.style.borderRadius = '6px';
+            playerItem.style.display = 'flex';
+            playerItem.style.alignItems = 'center';
+            playerItem.style.gap = '10px';
+            
+            const isYou = p.name === player.name;
+            
+            playerItem.innerHTML = `
+                <div style="width: 35px; height: 35px; border-radius: 50%; background: ${isYou ? '#ffcc00' : '#4ecdc4'}; display: flex; align-items: center; justify-content: center; color: ${isYou ? '#000' : 'white'};">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: bold; color: ${isYou ? '#ffcc00' : 'white'};">${p.name}${isYou ? ' (Tu)' : ''}</div>
+                    <div style="font-size: 0.8rem; color: #c9e4c5;">${p.cardsCount} cartella${p.cardsCount > 1 ? 'e' : ''}</div>
+                </div>
+            `;
+            
+            playersList.appendChild(playerItem);
+        });
     }
     
     // Funzione per generare le cartelle visuali
@@ -409,6 +575,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (cellData) {
                     cell.textContent = cellData.number;
                     cell.id = `card-${cardIndex}-num-${cellData.number}`;
+                    cell.dataset.number = cellData.number;
+                    cell.dataset.cardIndex = cardIndex;
+                    
+                    // Aggiungi evento per segnare manualmente (doppio click)
+                    let clickTimer;
+                    cell.addEventListener('click', function(e) {
+                        if (e.detail === 2) { // Doppio click
+                            markNumberManual(cardIndex, cellData.number);
+                        }
+                    });
+                    
+                    // Singolo click mostra info
+                    cell.addEventListener('click', function(e) {
+                        if (e.detail === 1) {
+                            clearTimeout(clickTimer);
+                            clickTimer = setTimeout(() => {
+                                if (room.extractedNumbers.includes(cellData.number)) {
+                                    showMessage(`Numero ${cellData.number} già estratto!`, 'info');
+                                } else {
+                                    showMessage(`Numero ${cellData.number} non ancora estratto`, 'info');
+                                }
+                            }, 300);
+                        }
+                    });
                     
                     if (cellData.marked) {
                         cell.classList.add('marked');
@@ -425,6 +615,43 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aggiungi contatori per riga
         addRowCounters(cardIndex);
         updateCardCount(cardIndex);
+    }
+    
+    // Funzione per segnare manualmente un numero
+    function markNumberManual(cardIndex, number) {
+        if (!player.isConnected) return;
+        
+        // Verifica che il numero sia stato estratto
+        if (!room.extractedNumbers.includes(number)) {
+            showMessage('Questo numero non è ancora stato estratto!', 'error');
+            return;
+        }
+        
+        // Invia al server
+        socket.emit('mark-number-manual', {
+            roomCode: player.roomCode,
+            cardIndex: cardIndex,
+            number: number
+        });
+        
+        // Aggiorna localmente
+        const cell = document.getElementById(`card-${cardIndex}-num-${number}`);
+        if (cell && !cell.classList.contains('marked')) {
+            cell.classList.add('marked');
+            
+            // Trova il numero nella struttura dati
+            const card = player.cards[cardIndex];
+            card.numbers.forEach(numObj => {
+                if (numObj.number === number) {
+                    numObj.marked = true;
+                }
+            });
+            
+            // Aggiorna conteggi
+            updateCardCount(cardIndex);
+            
+            showMessage(`Numero ${number} segnato manualmente!`, 'success');
+        }
     }
     
     // Funzione per aggiungere i contatori per riga
@@ -463,21 +690,12 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalMarked = 0;
         const rowCounts = [0, 0, 0];
         
-        // Aggiorna visualizzazione celle e conta
-        for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 9; col++) {
-                const cellData = cardData.rows[row][col];
-                if (cellData) {
-                    const cell = document.getElementById(`card-${cardIndex}-num-${cellData.number}`);
-                    if (cell) {
-                        if (cellData.marked && !cell.classList.contains('marked')) {
-                            cell.classList.add('marked');
-                        } else if (!cellData.marked && cell.classList.contains('marked')) {
-                            cell.classList.remove('marked');
-                        }
-                    }
-                    
-                    if (cellData.marked) {
+        // Conta numeri segnati
+        if (cardData.rows) {
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const cellData = cardData.rows[row][col];
+                    if (cellData && cellData.marked) {
                         totalMarked++;
                         rowCounts[row]++;
                     }
@@ -485,7 +703,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Aggiorna contatori
+        // Aggiorna contatori riga
         for (let row = 0; row < 3; row++) {
             const rowCounter = document.getElementById(`card-${cardIndex}-row-${row}`);
             if (rowCounter) {
@@ -500,6 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Aggiorna contatore totale
         const countElement = document.getElementById(`card-${cardIndex}-count`);
         if (countElement) {
             countElement.textContent = totalMarked;
@@ -553,6 +772,15 @@ document.addEventListener('DOMContentLoaded', function() {
             100% { transform: scale(1); }
         }
         
+        @keyframes tombola-pulse {
+            0%, 100% { 
+                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
+            }
+            50% { 
+                box-shadow: 0 0 30px rgba(255, 0, 0, 0.9);
+            }
+        }
+        
         @keyframes winning-pulse {
             0%, 100% { 
                 box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.7);
@@ -572,23 +800,37 @@ document.addEventListener('DOMContentLoaded', function() {
         
         .card-complete {
             border: 3px solid #ff0000 !important;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5) !important;
             position: relative;
         }
         
-        .card-complete::before {
-            content: '🎉 TOMBOLA!';
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ff0000;
+        .sheet-cell {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .sheet-cell.marked {
+            background: #009933;
             color: white;
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            z-index: 10;
+        }
+        
+        .simple-cell.extracted {
+            background: #d40000;
+            color: white;
+        }
+        
+        .simple-cell.just-extracted {
+            animation: flash 1s ease-in-out infinite;
+        }
+        
+        @keyframes flash {
+            0%, 100% { 
+                background: #d40000;
+                box-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
+            }
+            50% { 
+                background: #ffcc00;
+                box-shadow: 0 0 20px rgba(255, 204, 0, 1);
+            }
         }
     `;
     document.head.appendChild(style);
