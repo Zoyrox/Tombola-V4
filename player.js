@@ -1,4 +1,4 @@
-// Giocatore Tombola Natalizia - Versione semplificata
+// Giocatore Tombola Natalizia - Versione corretta per cartelle 3x9
 document.addEventListener('DOMContentLoaded', function() {
     // Imposta anno corrente
     document.getElementById('current-year').textContent = new Date().getFullYear();
@@ -27,9 +27,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const leaveRoomBtn = document.getElementById('leave-room-btn');
     const checkWinnerBtn = document.getElementById('check-winner-btn');
     
+    // Se c'è una stanza suggerita nel localStorage, precompila il campo
+    const suggestedRoom = localStorage.getItem('suggestedRoom');
+    if (suggestedRoom) {
+        document.getElementById('room-code').value = suggestedRoom;
+    }
+    
     // Gestione eventi
     joinBtn.addEventListener('click', joinRoom);
-    leaveRoomBtn.addEventListener('click', leaveRoom);
+    if (leaveRoomBtn) {
+        leaveRoomBtn.addEventListener('click', leaveRoom);
+    }
     checkWinnerBtn.addEventListener('click', checkWinner);
     
     // Join con Enter
@@ -109,12 +117,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Mostra l'area di gioco
         joinSection.style.display = 'none';
         gameSection.style.display = 'block';
-        leaveRoomBtn.style.display = 'inline-block';
+        if (leaveRoomBtn) {
+            leaveRoomBtn.style.display = 'inline-block';
+        }
         
         // Aggiorna le informazioni
         updateRoomInfo();
         
-        // Genera le cartelle visuali
+        // Genera le cartelle visuali (ora correttamente)
         generatePlayerCards();
         
         showMessage(`Benvenuto ${player.name}! Ti sei unito alla stanza ${player.roomCode}`, 'success');
@@ -139,7 +149,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             gameSection.style.display = 'none';
             joinSection.style.display = 'block';
-            leaveRoomBtn.style.display = 'none';
+            if (leaveRoomBtn) {
+                leaveRoomBtn.style.display = 'none';
+            }
             
             showMessage('Hai lasciato la stanza', 'info');
         }
@@ -269,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showMessage(error, 'error');
     }
     
-    // Funzione per generare le cartelle visuali (griglia 3x9)
+    // Funzione per generare le cartelle visuali CORRETTE (griglia 3x9)
     function generatePlayerCards() {
         const container = document.getElementById('tombola-cards-container');
         container.innerHTML = '';
@@ -298,58 +310,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Funzione per inizializzare la griglia 3x9 di una cartella
+    // Funzione per inizializzare la griglia 3x9 di una cartella CORRETTAMENTE
     function initCardGrid(cardIndex) {
         const grid = document.getElementById(`card-${cardIndex}`);
         grid.innerHTML = '';
         
         if (!player.cards[cardIndex]) return;
         
-        // Prepara i numeri in colonne (ogni colonna ha 3 numeri)
-        const columns = [[], [], [], [], [], [], [], [], []];
+        // Creiamo una griglia 3x9 vuota
+        const gridCells = Array(3).fill().map(() => Array(9).fill(null));
         
-        player.cards[cardIndex].forEach((numObj) => {
+        // Per ogni numero nella cartella, troviamo la sua colonna corretta
+        player.cards[cardIndex].forEach(numObj => {
             const num = numObj.number;
-            let colIndex;
+            let column;
             
-            if (num >= 1 && num <= 9) colIndex = 0;
-            else if (num >= 10 && num <= 19) colIndex = 1;
-            else if (num >= 20 && num <= 29) colIndex = 2;
-            else if (num >= 30 && num <= 39) colIndex = 3;
-            else if (num >= 40 && num <= 49) colIndex = 4;
-            else if (num >= 50 && num <= 59) colIndex = 5;
-            else if (num >= 60 && num <= 69) colIndex = 6;
-            else if (num >= 70 && num <= 79) colIndex = 7;
-            else colIndex = 8; // 80-90
+            // Determina la colonna in base al range del numero
+            if (num <= 9) column = 0;
+            else if (num <= 19) column = 1;
+            else if (num <= 29) column = 2;
+            else if (num <= 39) column = 3;
+            else if (num <= 49) column = 4;
+            else if (num <= 59) column = 5;
+            else if (num <= 69) column = 6;
+            else if (num <= 79) column = 7;
+            else column = 8; // 80-90
             
-            // Trova la prima posizione vuota in questa colonna
+            // Trova la prima riga vuota in questa colonna
             for (let row = 0; row < 3; row++) {
-                if (!columns[colIndex][row]) {
-                    columns[colIndex][row] = { number: num, marked: numObj.marked };
+                if (gridCells[row][column] === null) {
+                    gridCells[row][column] = {
+                        number: num,
+                        marked: numObj.marked
+                    };
                     break;
                 }
             }
         });
         
-        // Crea la griglia 3x9
+        // Ora creiamo la griglia HTML
         for (let row = 0; row < 3; row++) {
             for (let col = 0; col < 9; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'sheet-cell';
                 
-                if (columns[col][row]) {
-                    const numData = columns[col][row];
-                    cell.textContent = numData.number;
-                    cell.id = `card-${cardIndex}-num-${numData.number}`;
-                    if (numData.marked) cell.classList.add('marked');
-                    
-                    // Aggiungi evento click per segnare manualmente
-                    cell.addEventListener('click', function() {
-                        // I giocatori non possono più cliccare per segnare manualmente
-                        // I numeri vengono segnati automaticamente quando estratti
-                    });
+                const cellData = gridCells[row][col];
+                if (cellData) {
+                    cell.textContent = cellData.number;
+                    cell.id = `card-${cardIndex}-num-${cellData.number}`;
+                    if (cellData.marked) {
+                        cell.classList.add('marked');
+                    }
                 } else {
                     cell.classList.add('empty');
+                    cell.textContent = '';
                 }
                 
                 grid.appendChild(cell);
@@ -364,20 +378,31 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!player.cards[cardIndex]) return;
         
         const markedCount = player.cards[cardIndex].filter(num => num.marked).length;
-        document.getElementById(`card-${cardIndex}-count`).textContent = markedCount;
+        const countElement = document.getElementById(`card-${cardIndex}-count`);
+        if (countElement) {
+            countElement.textContent = markedCount;
+        }
     }
     
     // Funzione per aggiornare le informazioni della stanza
     function updateRoomInfo() {
-        document.getElementById('room-name-display').textContent = room.name;
-        document.getElementById('room-code-display').textContent = player.roomCode;
-        document.getElementById('player-name-display').textContent = player.name;
-        document.getElementById('room-players').textContent = room.players.length;
-        document.getElementById('last-number-display').textContent = room.lastNumber || '--';
+        const roomNameDisplay = document.getElementById('room-name-display');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        const playerNameDisplay = document.getElementById('player-name-display');
+        const roomPlayersDisplay = document.getElementById('room-players');
+        const lastNumberDisplay = document.getElementById('last-number-display');
+        
+        if (roomNameDisplay) roomNameDisplay.textContent = room.name;
+        if (roomCodeDisplay) roomCodeDisplay.textContent = player.roomCode;
+        if (playerNameDisplay) playerNameDisplay.textContent = player.name;
+        if (roomPlayersDisplay) roomPlayersDisplay.textContent = room.players.length;
+        if (lastNumberDisplay) lastNumberDisplay.textContent = room.lastNumber || '--';
     }
     
     // Funzione per mostrare messaggi
     function showMessage(text, type) {
+        if (!messageDiv) return;
+        
         messageDiv.textContent = text;
         messageDiv.className = `message ${type}`;
         messageDiv.style.display = 'block';
