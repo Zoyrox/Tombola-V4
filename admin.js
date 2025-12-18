@@ -1,72 +1,4 @@
-// Aggiungi questa funzione al file admin.js:
-
-function updatePlayersList() {
-    const playersList = document.getElementById('players-list');
-    const countElement = document.getElementById('players-count');
-    const totalElement = document.getElementById('players-total');
-    
-    if (players.length === 0) {
-        playersList.innerHTML = '<p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>';
-        countElement.textContent = '0';
-        totalElement.textContent = '0';
-        return;
-    }
-    
-    playersList.innerHTML = '';
-    countElement.textContent = players.length;
-    totalElement.textContent = players.length;
-    
-    players.forEach(player => {
-        const playerElement = document.createElement('div');
-        playerElement.style.padding = '12px';
-        playerElement.style.marginBottom = '10px';
-        playerElement.style.background = 'rgba(255,255,255,0.05)';
-        playerElement.style.borderRadius = '8px';
-        playerElement.style.display = 'flex';
-        playerElement.style.alignItems = 'center';
-        playerElement.style.gap = '12px';
-        
-        // Calcola statistiche
-        const totalNumbers = 15 * player.cardsCount;
-        const percentage = player.markedCount ? Math.round((player.markedCount / totalNumbers) * 100) : 0;
-        
-        // Determina se ha fatto vincite
-        let winsHTML = '';
-        if (player.markedCount >= 2) {
-            winsHTML = `<div style="font-size: 0.8rem; color: #ffcc00; margin-top: 3px;">
-                <i class="fas fa-trophy"></i> In gioco
-            </div>`;
-        }
-        if (player.markedCount === totalNumbers) {
-            winsHTML = `<div style="font-size: 0.8rem; color: #ff0000; font-weight: bold; margin-top: 3px;">
-                <i class="fas fa-crown"></i> TOMBOLA!
-            </div>`;
-        }
-        
-        playerElement.innerHTML = `
-            <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #4ecdc4); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">
-                <i class="fas fa-user"></i>
-            </div>
-            <div style="flex: 1;">
-                <div style="font-weight: bold; font-size: 1.1rem;">${player.name}</div>
-                <div style="font-size: 0.9rem; color: #c9e4c5;">
-                    <i class="fas fa-table"></i> ${player.cardsCount} cartella${player.cardsCount > 1 ? 'e' : ''}
-                </div>
-                ${winsHTML}
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 1.2rem; font-weight: bold; color: #ffcc00;">${player.markedCount || 0}</div>
-                <div style="font-size: 0.8rem; color: #c9e4c5;">${percentage}%</div>
-                <div style="font-size: 0.7rem; color: rgba(201, 228, 197, 0.6);">/${totalNumbers}</div>
-            </div>
-        `;
-        
-        playersList.appendChild(playerElement);
-    });
-}
-
-
-// Admin Tombola Natalizia - Con controllo accesso e caselle semplici
+// Admin Tombola Natalizia
 document.addEventListener('DOMContentLoaded', function() {
     // Controlla se l'utente è autenticato
     const adminToken = localStorage.getItem('adminToken');
@@ -126,9 +58,9 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('room-created', handleRoomCreated);
     socket.on('number-extracted-admin', handleNumberExtracted);
     socket.on('room-update', handleRoomUpdate);
-    socket.on('player-updated', handlePlayerUpdated);
     socket.on('extraction-reset-admin', handleExtractionReset);
     socket.on('admin-room-data', handleAdminRoomData);
+    socket.on('extraction-error', handleExtractionError);
     
     // Funzione per creare una stanza
     function createRoom() {
@@ -178,12 +110,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (extractedNumbers.length >= 90) {
-            showMessage('Tutti i numeri sono già stati estratti!', 'info');
-            return;
-        }
-        
         socket.emit('extract-number', currentRoom.roomCode);
+    }
+    
+    // Gestione errore estrazione
+    function handleExtractionError(error) {
+        showMessage(error, 'error');
     }
     
     // Gestione numero estratto (con effetto lampeggiante)
@@ -267,15 +199,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updatePlayersList();
     }
     
-    // Gestione aggiornamento giocatore
-    function handlePlayerUpdated(data) {
-        const playerIndex = players.findIndex(p => p.id === data.playerId);
-        if (playerIndex !== -1) {
-            players[playerIndex].markedCount = data.markedCount;
-            updatePlayersList();
-        }
-    }
-    
     // Gestione dati stanza per admin
     function handleAdminRoomData(data) {
         players = data.players || [];
@@ -308,31 +231,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Funzioni di utilità
     function showMessage(text, type) {
         // Crea un div per il messaggio se non esiste
-        if (!messageDiv) {
-            const newMessageDiv = document.createElement('div');
-            newMessageDiv.id = 'message';
-            newMessageDiv.className = `message ${type}`;
-            newMessageDiv.textContent = text;
-            newMessageDiv.style.display = 'block';
-            document.querySelector('.container').insertBefore(newMessageDiv, document.getElementById('admin-panel'));
-            
-            setTimeout(() => {
-                newMessageDiv.remove();
-            }, 5000);
-        } else {
-            messageDiv.textContent = text;
-            messageDiv.className = `message ${type}`;
-            messageDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 5000);
+        let msgDiv = messageDiv;
+        if (!msgDiv) {
+            msgDiv = document.createElement('div');
+            msgDiv.id = 'message';
+            document.querySelector('.container').insertBefore(msgDiv, document.getElementById('admin-panel'));
         }
+        
+        msgDiv.textContent = text;
+        msgDiv.className = `message ${type}`;
+        msgDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            msgDiv.style.display = 'none';
+        }, 5000);
     }
     
     // Funzione per inizializzare la griglia semplice
     function initSimpleNumbersGrid() {
         const grid = document.getElementById('extracted-numbers');
+        if (!grid) return;
+        
         grid.innerHTML = '';
         
         for (let i = 1; i <= 90; i++) {
@@ -347,6 +266,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Aggiorna il display del numero estratto
     function updateExtractedNumberDisplay(number) {
         const display = document.getElementById('extracted-number');
+        if (!display) return;
+        
         display.textContent = number;
         
         // Effetto animazione
@@ -377,7 +298,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Aggiorna il conteggio
-        document.getElementById('extracted-count').textContent = extractedNumbers.length;
+        const countElement = document.getElementById('extracted-count');
+        if (countElement) {
+            countElement.textContent = extractedNumbers.length;
+        }
     }
     
     // Aggiorna la griglia normalmente (senza effetti speciali)
@@ -395,12 +319,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Aggiorna il conteggio
-        document.getElementById('extracted-count').textContent = extractedNumbers.length;
+        const countElement = document.getElementById('extracted-count');
+        if (countElement) {
+            countElement.textContent = extractedNumbers.length;
+        }
     }
     
     function updateExtractionProgress() {
+        const progressBar = document.getElementById('extraction-progress');
+        if (!progressBar) return;
+        
         const progress = (extractedNumbers.length / 90) * 100;
-        document.getElementById('extraction-progress').style.width = `${progress}%`;
+        progressBar.style.width = `${progress}%`;
     }
     
     function updatePlayersList() {
@@ -408,16 +338,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const countElement = document.getElementById('players-count');
         const totalElement = document.getElementById('players-total');
         
+        if (!playersList) return;
+        
         if (players.length === 0) {
             playersList.innerHTML = '<p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>';
-            countElement.textContent = '0';
-            totalElement.textContent = '0';
+            if (countElement) countElement.textContent = '0';
+            if (totalElement) totalElement.textContent = '0';
             return;
         }
         
         playersList.innerHTML = '';
-        countElement.textContent = players.length;
-        totalElement.textContent = players.length;
+        if (countElement) countElement.textContent = players.length;
+        if (totalElement) totalElement.textContent = players.length;
         
         players.forEach(player => {
             const playerElement = document.createElement('div');
@@ -429,9 +361,20 @@ document.addEventListener('DOMContentLoaded', function() {
             playerElement.style.alignItems = 'center';
             playerElement.style.gap = '12px';
             
-            // Calcola percentuale di completamento
+            // Calcola percentuale
             const totalNumbers = 15 * player.cardsCount;
             const percentage = player.markedCount ? Math.round((player.markedCount / totalNumbers) * 100) : 0;
+            
+            // Determina stato
+            let status = '';
+            if (player.markedCount >= 2) {
+                status = '<div style="font-size: 0.8rem; color: #4ecdc4;"><i class="fas fa-gamepad"></i> In gioco</div>';
+            }
+            if (player.markedCount === totalNumbers) {
+                status = '<div style="font-size: 0.8rem; color: #ff0000; font-weight: bold;"><i class="fas fa-crown"></i> TOMBOLA!</div>';
+            } else if (player.markedCount >= 10) {
+                status = '<div style="font-size: 0.8rem; color: #ff9900;"><i class="fas fa-fire"></i> In vantaggio</div>';
+            }
             
             playerElement.innerHTML = `
                 <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #4ecdc4); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">
@@ -442,6 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div style="font-size: 0.9rem; color: #c9e4c5;">
                         <i class="fas fa-table"></i> ${player.cardsCount} cartella${player.cardsCount > 1 ? 'e' : ''}
                     </div>
+                    ${status}
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 1.2rem; font-weight: bold; color: #ffcc00;">${player.markedCount || 0}</div>
