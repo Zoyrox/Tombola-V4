@@ -367,23 +367,61 @@ function generateCards(count) {
     return cards;
 }
 
+// Sostituisci la funzione generateTombolaCard() nel server.js con questa:
+
 function generateTombolaCard() {
-    // Una cartella tombola ha 15 numeri in una griglia 3x9
-    // Ogni riga ha 5 numeri, ogni colonna ha 1-3 numeri
-    // Colonne: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69, 70-79, 80-90
+    // Una cartella tombola ufficiale ha 15 numeri in una griglia 3x9
+    // Regole:
+    // 1. Ogni riga ha esattamente 5 numeri
+    // 2. Ogni colonna ha da 1 a 3 numeri
+    // 3. I numeri sono organizzati per decine nelle colonne:
+    //    Col1: 1-9, Col2: 10-19, Col3: 20-29, ..., Col9: 80-90
     
-    const card = [];
-    const numbersByColumn = Array(9).fill().map(() => []);
+    const card = {
+        numbers: [], // Array di oggetti {number, marked}
+        rows: [[], [], []] // Per memorizzare la struttura 3x9
+    };
     
-    // Genera numeri per ogni colonna
+    // Inizializza la griglia 3x9 con celle vuote
+    const grid = Array(3).fill().map(() => Array(9).fill(null));
+    
+    // Per ogni colonna (1-9), determina quanti numeri mettere (1, 2 o 3)
+    const numbersPerColumn = Array(9).fill(0);
+    
+    // Distribuisci i 15 numeri tra le 9 colonne
+    let remainingNumbers = 15;
     for (let col = 0; col < 9; col++) {
+        if (col === 8) { // Ultima colonna prende i rimanenti
+            numbersPerColumn[col] = remainingNumbers;
+        } else {
+            // Determina casualmente 1, 2 o 3 numeri per questa colonna
+            // Assicurati che ci siano abbastanza colonne rimanenti per i numeri rimasti
+            const maxForThisCol = Math.min(3, remainingNumbers - (8 - col));
+            const minForThisCol = Math.max(1, remainingNumbers - (3 * (8 - col)));
+            const count = Math.floor(Math.random() * (maxForThisCol - minForThisCol + 1)) + minForThisCol;
+            
+            numbersPerColumn[col] = count;
+            remainingNumbers -= count;
+        }
+    }
+    
+    // Mescola l'ordine delle colonne per varietà
+    for (let i = numbersPerColumn.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [numbersPerColumn[i], numbersPerColumn[j]] = [numbersPerColumn[j], numbersPerColumn[i]];
+    }
+    
+    // Per ogni colonna, genera i numeri e posizionali nelle righe
+    for (let col = 0; col < 9; col++) {
+        const count = numbersPerColumn[col];
+        
+        // Determina il range per questa colonna
         const min = col * 10 + 1;
         const max = col === 8 ? 90 : (col + 1) * 10;
-        const countInColumn = col < 8 ? 3 : 4; // L'ultima colonna ha 4 numeri (80-90)
         
-        // Genera numeri unici per questa colonna
+        // Genera 'count' numeri unici per questa colonna
         const columnNumbers = [];
-        while (columnNumbers.length < countInColumn) {
+        while (columnNumbers.length < count) {
             const num = Math.floor(Math.random() * (max - min + 1)) + min;
             if (!columnNumbers.includes(num)) {
                 columnNumbers.push(num);
@@ -392,50 +430,129 @@ function generateTombolaCard() {
         
         // Ordina i numeri
         columnNumbers.sort((a, b) => a - b);
-        numbersByColumn[col] = columnNumbers;
+        
+        // Determina in quali righe posizionare questi numeri
+        const rowIndices = [0, 1, 2];
+        // Mescola le righe per posizionamento casuale
+        for (let i = rowIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rowIndices[i], rowIndices[j]] = [rowIndices[j], rowIndices[i]];
+        }
+        
+        // Posiziona i numeri nelle prime 'count' righe dell'array mescolato
+        for (let i = 0; i < count; i++) {
+            const row = rowIndices[i];
+            grid[row][col] = {
+                number: columnNumbers[i],
+                marked: false
+            };
+        }
     }
     
-    // Distribuisci i numeri nelle 3 righe
-    const rows = [[], [], []];
-    
-    // Prima, riempi ogni riga con esattamente 5 numeri
+    // Converti la griglia in array lineare per il frontend
     for (let row = 0; row < 3; row++) {
-        // Conta quanti numeri deve avere questa riga
-        let numbersToAdd = 5;
-        
-        // Distribuisci i numeri dalle colonne
-        for (let col = 0; col < 9 && numbersToAdd > 0; col++) {
-            // Se questa colonna ha numeri da assegnare a questa riga
-            if (numbersByColumn[col].length > 0) {
-                const num = numbersByColumn[col].shift();
-                rows[row].push({
-                    number: num,
-                    column: col,
-                    marked: false
-                });
-                numbersToAdd--;
+        for (let col = 0; col < 9; col++) {
+            if (grid[row][col]) {
+                card.numbers.push(grid[row][col]);
+                card.rows[row].push(grid[row][col]);
+            } else {
+                card.rows[row].push(null);
             }
         }
     }
     
-    // Ordina ogni riga per colonna
-    rows.forEach(row => {
-        row.sort((a, b) => a.column - b.column);
-    });
-    
-    // Combina tutte le righe in un'unica lista di numeri per la cartella
-    rows.forEach(row => {
-        row.forEach(cell => {
-            card.push({
-                number: cell.number,
-                marked: false
-            });
-        });
-    });
-    
     return card;
 }
 
+// Modifica la funzione checkWinners per controllare ambo, terna, etc.
+function checkWinners(roomCode, newNumber) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    room.players.forEach(player => {
+        player.cards.forEach((card, cardIndex) => {
+            // Controlla per ogni riga della cartella
+            card.rows.forEach((row, rowIndex) => {
+                const markedInRow = row.filter(cell => cell && cell.marked).length;
+                
+                // Controlla le varie vincite
+                if (markedInRow >= 2) {
+                    // Ambo (2 numeri)
+                    if (markedInRow === 2) {
+                        io.to(player.socketId).emit('win-detected', {
+                            type: 'ambo',
+                            row: rowIndex,
+                            cardIndex: cardIndex
+                        });
+                    }
+                    // Terna (3 numeri)
+                    if (markedInRow === 3) {
+                        io.to(player.socketId).emit('win-detected', {
+                            type: 'terna',
+                            row: rowIndex,
+                            cardIndex: cardIndex
+                        });
+                    }
+                    // Quaterna (4 numeri)
+                    if (markedInRow === 4) {
+                        io.to(player.socketId).emit('win-detected', {
+                            type: 'quaterna',
+                            row: rowIndex,
+                            cardIndex: cardIndex
+                        });
+                    }
+                    // Cinquina (5 numeri) - riga completa
+                    if (markedInRow === 5) {
+                        io.to(player.socketId).emit('win-detected', {
+                            type: 'cinquina',
+                            row: rowIndex,
+                            cardIndex: cardIndex
+                        });
+                        
+                        // Notifica a tutti che qualcuno ha fatto cinquina
+                        io.to(roomCode).emit('player-cinquina', {
+                            playerName: player.name,
+                            cardIndex: cardIndex,
+                            row: rowIndex + 1
+                        });
+                    }
+                }
+            });
+            
+            // Controlla Tombola (tutti i 15 numeri della cartella)
+            const totalMarked = card.numbers.filter(num => num.marked).length;
+            if (totalMarked === 15) {
+                io.to(roomCode).emit('player-won', {
+                    playerName: player.name,
+                    cardIndex: cardIndex,
+                    type: 'tombola'
+                });
+            }
+        });
+    });
+}
+
+// Modifica anche la funzione countMarkedNumbers per contare per riga
+function countMarkedNumbers(player) {
+    let total = 0;
+    let byRow = [0, 0, 0];
+    
+    player.cards.forEach(card => {
+        card.numbers.forEach(num => {
+            if (num.marked) total++;
+        });
+        
+        // Conta anche per riga
+        if (card.rows) {
+            card.rows.forEach((row, index) => {
+                const markedInRow = row.filter(cell => cell && cell.marked).length;
+                byRow[index] += markedInRow;
+            });
+        }
+    });
+    
+    return { total, byRow };
+}
 function countMarkedNumbers(player) {
     let total = 0;
     player.cards.forEach(card => {
