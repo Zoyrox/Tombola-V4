@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Natalizia - Admin</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="snow-container"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-crown"></i> Pannello Amministratore</h1>
+            <p class="subtitle">Crea stanze, gestisci giocatori e estrai numeri</p>
+            <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">
+                <i class="fas fa-home"></i> Torna alla Home
+            </a>
+        </div>
+        
+        <div id="login-section" class="form-container">
+            <h2 style="text-align: center; color: #ffcc00; margin-bottom: 30px;">
+                <i class="fas fa-lock"></i> Accesso Admin
+            </h2>
+            
+            <div id="message" class="message" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="admin-email"><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" id="admin-email" class="form-control" placeholder="admin@tombola.it">
+            </div>
+            
+            <div class="form-group">
+                <label for="admin-password"><i class="fas fa-key"></i> Password</label>
+                <input type="password" id="admin-password" class="form-control" placeholder="Inserisci la password">
+            </div>
+            
+            <button id="login-btn" class="btn btn-admin" style="width: 100%;">
+                <i class="fas fa-sign-in-alt"></i> Accedi come Admin
+            </button>
+            
+            <div style="text-align: center; margin-top: 20px; color: #c9e4c5;">
+                <p>Credenziali di default: admin@tombola.it / password123</p>
+            </div>
+        </div>
+        
+        <div id="admin-panel" class="admin-panel" style="display: none;">
+            <div class="panel-section">
+                <h3><i class="fas fa-plus-circle"></i> Gestione Stanza</h3>
+                
+                <div class="form-group">
+                    <label for="room-name">Nome Stanza</label>
+                    <input type="text" id="room-name" class="form-control" placeholder="Es: Tombola di Natale 2023">
+                </div>
+                
+                <div class="form-group">
+                    <label for="max-players">Numero Massimo Giocatori</label>
+                    <select id="max-players" class="form-control">
+                        <option value="10">10 giocatori</option>
+                        <option value="20" selected>20 giocatori</option>
+                        <option value="30">30 giocatori</option>
+                        <option value="50">50 giocatori</option>
+                    </select>
+                </div>
+                
+                <button id="create-room-btn" class="btn btn-admin" style="width: 100%;">
+                    <i class="fas fa-plus"></i> Crea Nuova Stanza
+                </button>
+                
+                <div id="room-info" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; display: none;">
+                    <h4 style="color: #ffcc00; margin-bottom: 10px;">
+                        <i class="fas fa-door-open"></i> Stanza Creata
+                    </h4>
+                    <p><strong>ID Stanza:</strong> <span id="room-id" style="color: #ffcc00; font-weight: bold;"></span></p>
+                    <p><strong>Nome:</strong> <span id="room-name-display"></span></p>
+                    <p><strong>Giocatori collegati:</strong> <span id="players-count">0</span></p>
+                    <p style="margin-top: 15px;">Condividi questo codice con i giocatori:</p>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" id="room-code-share" class="form-control" readonly style="font-weight: bold; text-align: center;">
+                        <button id="copy-code-btn" class="btn btn-secondary">
+                            <i class="fas fa-copy"></i> Copia
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <h3><i class="fas fa-random"></i> Estrazione Numeri</h3>
+                
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div id="extracted-number" style="font-size: 5rem; font-weight: bold; color: #ffcc00; text-shadow: 3px 3px 0 #d40000;">
+                        --
+                    </div>
+                    <p style="color: #c9e4c5;">Ultimo numero estratto</p>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button id="extract-btn" class="btn btn-admin" style="flex: 1;">
+                        <i class="fas fa-dice"></i> Estrai Numero
+                    </button>
+                    <button id="reset-extraction-btn" class="btn btn-secondary" style="flex: 1;">
+                        <i class="fas fa-redo"></i> Reset Estrazione
+                    </button>
+                </div>
+                
+                <button id="auto-extract-btn" class="btn btn-player" style="width: 100%; margin-bottom: 10px;">
+                    <i class="fas fa-play"></i> Auto Estrazione (5s)
+                </button>
+                
+                <div id="extraction-info" style="margin-top: 15px;">
+                    <p><strong>Numeri estratti:</strong> <span id="extracted-count">0</span>/90</p>
+                    <div class="progress-bar" style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 5px;">
+                        <div id="extraction-progress" style="height: 100%; background: #d40000; border-radius: 5px; width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <h3><i class="fas fa-list-ol"></i> Numeri Estratti</h3>
+                <div id="extracted-numbers" class="numbers-grid">
+                    <!-- I numeri estratti appariranno qui -->
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <h3><i class="fas fa-users"></i> Giocatori Connessi</h3>
+                <div id="players-list">
+                    <p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="footer">
+            <p>Pannello Amministratore Tombola Natalizia | <span id="current-year"></span></p>
+        </footer>
+    </div>
+    
+    <script src="snow.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
