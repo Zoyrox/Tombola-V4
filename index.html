@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <div id="snow-container"></div>
@@ -14,7 +15,7 @@
     <div class="container welcome-container">
         <div class="header">
             <h1><i class="fas fa-snowflake"></i> Tombola Natalizia <i class="fas fa-snowflake"></i></h1>
-            <p class="subtitle">Gioca alla tombola online con amici e famiglia!</p>
+            <p class="subtitle">Gioca alla tombola online in tempo reale con amici e famiglia!</p>
         </div>
         
         <div class="welcome-content">
@@ -23,7 +24,7 @@
                     <i class="fas fa-crown"></i>
                 </div>
                 <h2>Amministratore</h2>
-                <p>Crea una stanza, gestisci i giocatori e estrai i numeri.</p>
+                <p>Crea una stanza, gestisci i giocatori e estrai i numeri in tempo reale.</p>
                 <a href="admin.html" class="btn btn-admin">Vai al Pannello Admin</a>
             </div>
             
@@ -32,7 +33,7 @@
                     <i class="fas fa-user-friends"></i>
                 </div>
                 <h2>Giocatore</h2>
-                <p>Unisciti a una stanza e gioca con la tua scheda personale.</p>
+                <p>Unisciti a una stanza e gioca con la tua scheda personale in tempo reale.</p>
                 <a href="player.html" class="btn btn-player">Vai al Pannello Giocatore</a>
             </div>
         </div>
@@ -50,20 +51,65 @@
                 </div>
                 <div class="step">
                     <span class="step-number">3</span>
-                    <p>L'amministratore estrae i numeri e i giocatori segnano le cartelle</p>
+                    <p>L'amministratore estrae i numeri in tempo reale</p>
                 </div>
                 <div class="step">
                     <span class="step-number">4</span>
-                    <p>Il primo che completa la cartella vince!</p>
+                    <p>I giocatori segnano automaticamente le cartelle</p>
                 </div>
             </div>
         </div>
         
+        <div class="current-rooms" id="current-rooms" style="display: none;">
+            <h3><i class="fas fa-door-open"></i> Stanze Attive</h3>
+            <div id="rooms-list"></div>
+        </div>
+        
         <footer class="footer">
-            <p>Made with <i class="fas fa-heart"></i> per il Natale 2023 | Hosted on Render.com</p>
+            <p>Made with <i class="fas fa-heart"></i> per il Natale | Hosted on Render.com</p>
         </footer>
     </div>
     
     <script src="snow.js"></script>
+    <script>
+        // Mostra stanze attive
+        document.addEventListener('DOMContentLoaded', function() {
+            const socket = io();
+            
+            socket.on('connect', () => {
+                socket.emit('get-active-rooms');
+            });
+            
+            socket.on('active-rooms', (rooms) => {
+                if (rooms.length > 0) {
+                    const roomsList = document.getElementById('rooms-list');
+                    const roomsContainer = document.getElementById('current-rooms');
+                    
+                    roomsList.innerHTML = '';
+                    rooms.forEach(room => {
+                        const roomElement = document.createElement('div');
+                        roomElement.className = 'room-item';
+                        roomElement.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px; margin-bottom: 10px;">
+                                <div>
+                                    <strong>${room.name}</strong>
+                                    <div style="font-size: 0.9rem; color: #c9e4c5;">
+                                        Codice: <span style="color: #ffcc00;">${room.id}</span> | 
+                                        Giocatori: ${room.players}
+                                    </div>
+                                </div>
+                                <a href="player.html" class="btn btn-player" style="padding: 8px 16px; font-size: 0.9rem;">
+                                    Unisciti
+                                </a>
+                            </div>
+                        `;
+                        roomsList.appendChild(roomElement);
+                    });
+                    
+                    roomsContainer.style.display = 'block';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
