@@ -1,3 +1,71 @@
+// Aggiungi questa funzione al file admin.js:
+
+function updatePlayersList() {
+    const playersList = document.getElementById('players-list');
+    const countElement = document.getElementById('players-count');
+    const totalElement = document.getElementById('players-total');
+    
+    if (players.length === 0) {
+        playersList.innerHTML = '<p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>';
+        countElement.textContent = '0';
+        totalElement.textContent = '0';
+        return;
+    }
+    
+    playersList.innerHTML = '';
+    countElement.textContent = players.length;
+    totalElement.textContent = players.length;
+    
+    players.forEach(player => {
+        const playerElement = document.createElement('div');
+        playerElement.style.padding = '12px';
+        playerElement.style.marginBottom = '10px';
+        playerElement.style.background = 'rgba(255,255,255,0.05)';
+        playerElement.style.borderRadius = '8px';
+        playerElement.style.display = 'flex';
+        playerElement.style.alignItems = 'center';
+        playerElement.style.gap = '12px';
+        
+        // Calcola statistiche
+        const totalNumbers = 15 * player.cardsCount;
+        const percentage = player.markedCount ? Math.round((player.markedCount / totalNumbers) * 100) : 0;
+        
+        // Determina se ha fatto vincite
+        let winsHTML = '';
+        if (player.markedCount >= 2) {
+            winsHTML = `<div style="font-size: 0.8rem; color: #ffcc00; margin-top: 3px;">
+                <i class="fas fa-trophy"></i> In gioco
+            </div>`;
+        }
+        if (player.markedCount === totalNumbers) {
+            winsHTML = `<div style="font-size: 0.8rem; color: #ff0000; font-weight: bold; margin-top: 3px;">
+                <i class="fas fa-crown"></i> TOMBOLA!
+            </div>`;
+        }
+        
+        playerElement.innerHTML = `
+            <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #4ecdc4); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">
+                <i class="fas fa-user"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-weight: bold; font-size: 1.1rem;">${player.name}</div>
+                <div style="font-size: 0.9rem; color: #c9e4c5;">
+                    <i class="fas fa-table"></i> ${player.cardsCount} cartella${player.cardsCount > 1 ? 'e' : ''}
+                </div>
+                ${winsHTML}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 1.2rem; font-weight: bold; color: #ffcc00;">${player.markedCount || 0}</div>
+                <div style="font-size: 0.8rem; color: #c9e4c5;">${percentage}%</div>
+                <div style="font-size: 0.7rem; color: rgba(201, 228, 197, 0.6);">/${totalNumbers}</div>
+            </div>
+        `;
+        
+        playersList.appendChild(playerElement);
+    });
+}
+
+
 // Admin Tombola Natalizia - Con controllo accesso e caselle semplici
 document.addEventListener('DOMContentLoaded', function() {
     // Controlla se l'utente è autenticato
