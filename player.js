@@ -569,20 +569,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Funzione per segnare manualmente un numero
-    function markNumberManual(cardIndex, number) {
+    // Sostituisci la funzione markNumberManual con questa:
+
+    // Funzione per segnare manualmente un numero
+    async function markNumberManual(cardIndex, number) {
         if (!player.isConnected) return;
         
-        // Non possiamo verificare se il numero è stato estratto
-        // perché non abbiamo la lista completa
-        // Quindi inviamo comunque la richiesta al server
-        socket.emit('mark-number-manual', {
-            roomCode: player.roomCode,
-            cardIndex: cardIndex,
-            number: number
-        });
-        
-        // Mostra messaggio
-        showMessage(`Richiesta di segnare il numero ${number} inviata...`, 'info');
+        // Prima verifica se il numero è stato estratto
+        try {
+            const response = await fetch(`/api/room/${player.roomCode}/check-number/${number}`);
+            const data = await response.json();
+            
+            if (!data.exists) {
+                showMessage('Errore: stanza non trovata', 'error');
+                return;
+            }
+            
+            if (!data.extracted) {
+                showMessage(`Il numero ${number} non è ancora stato estratto!`, 'error');
+                return;
+            }
+            
+            // Il numero è stato estratto, invia la richiesta al server
+            socket.emit('mark-number-manual', {
+                roomCode: player.roomCode,
+                cardIndex: cardIndex,
+                number: number
+            });
+            
+            // Aggiorna localmente per feedback immediato
+            const cell = document.getElementById(`card-${cardIndex}-num-${number}`);
+            if (cell && !cell.classList.contains('marked')) {
+                cell.classList.add('marked');
+                
+                // Trova il numero nella struttura dati e segnalo
+                const card = player.cards[cardIndex];
+                if (card && card.numbers) {
+                    const numObj = card.numbers.find(n => n.number === number);
+                    if (numObj) {
+                        numObj.marked = true;
+                    }
+                }
+                
+                // Aggiorna conteggi
+                updateCardCount(cardIndex);
+                
+                showMessage(`Numero ${number} segnato!`, 'success');
+            }
+            
+        } catch (error) {
+            console.error('Error checking number:', error);
+            showMessage('Errore di connessione al server', 'error');
+        }
     }
     
     // Funzione per aggiungere i contatori per riga
