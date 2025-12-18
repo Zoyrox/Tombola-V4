@@ -21,7 +21,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'password123';
 const rooms = new Map();
 const players = new Map();
 
-// Storico vincite per stanza - solo le prime vincite di ogni tipo
+// Storico vincite globali per stanza
 const winHistory = new Map();
 
 // Funzione per generare ID unici
@@ -98,7 +98,6 @@ app.get('/api/active-rooms', (req, res) => {
     res.json(activeRooms);
 });
 
-
 // API per verificare se un numero è stato estratto in una stanza
 app.get('/api/room/:code/check-number/:number', (req, res) => {
     const roomCode = req.params.code.toUpperCase();
@@ -119,15 +118,7 @@ app.get('/api/room/:code/check-number/:number', (req, res) => {
 
 // FUNZIONE PER GENERARE CARTELLE TOMBOLA CORRETTE (max 2 numeri per colonna)
 function generateTombolaCard() {
-    // Una cartella tombola ha 15 numeri distribuiti in 3 righe e 9 colonne
-    // Regole: 
-    // - Ogni riga ha esattamente 5 numeri (e 4 spazi vuoti)
-    // - Ogni colonna può avere 1 o 2 numeri (mai 3)
-    // - I numeri sono organizzati per decine
-    
     const grid = Array(3).fill().map(() => Array(9).fill(null));
-    
-    // Inizializza contatori
     const rowCounts = [0, 0, 0];
     const colCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     
@@ -166,14 +157,12 @@ function generateTombolaCard() {
         const availableRows = [0, 1, 2];
         
         for (let i = 0; i < numbersNeeded; i++) {
-            // Trova una riga con meno di 5 numeri
             let row;
             let attempts = 0;
             do {
                 row = availableRows[Math.floor(Math.random() * availableRows.length)];
                 attempts++;
                 if (attempts > 10) {
-                    // Fallback: trova qualsiasi riga con spazio
                     for (let r = 0; r < 3; r++) {
                         if (rowCounts[r] < 5 && !grid[r][col]) {
                             row = r;
@@ -186,22 +175,18 @@ function generateTombolaCard() {
             grid[row][col] = { number: colNumbers[i], marked: false };
             rowCounts[row]++;
             
-            // Rimuovi questa riga dalle disponibili per questa colonna
             const index = availableRows.indexOf(row);
             if (index > -1) availableRows.splice(index, 1);
         }
     }
     
-    // Controlla e sistema distribuzione
+    // Sistema distribuzione se necessario
     for (let row = 0; row < 3; row++) {
         while (rowCounts[row] < 5) {
-            // Trova una colonna dove questa riga non ha numero e un'altra riga ne ha due
             for (let col = 0; col < 9; col++) {
                 if (!grid[row][col]) {
-                    // Cerca una riga che ha un numero in questa colonna e ha più di 5 numeri
                     for (let otherRow = 0; otherRow < 3; otherRow++) {
                         if (otherRow !== row && grid[otherRow][col] && rowCounts[otherRow] > 5) {
-                            // Sposta il numero
                             grid[row][col] = grid[otherRow][col];
                             grid[otherRow][col] = null;
                             rowCounts[row]++;
@@ -254,16 +239,11 @@ function countMarkedNumbers(player) {
 }
 
 // Controlla se una vincita di un certo tipo è già stata fatta nella stanza
-function hasWinTypeBeenMade(roomCode, winType, rowIndex = null) {
+function hasWinTypeBeenMade(roomCode, winType) {
     const history = winHistory.get(roomCode);
     if (!history) return false;
     
-    return history.some(win => {
-        if (win.type !== winType) return false;
-        // Per ambo/terna/quaterna/cinquina, controlla anche la riga
-        if (rowIndex !== null && win.rowIndex !== rowIndex) return false;
-        return true;
-    });
+    return history.some(win => win.type === winType);
 }
 
 // Registra una vincita (solo se è la prima di quel tipo)
@@ -275,7 +255,7 @@ function recordWin(roomCode, winData) {
     const history = winHistory.get(roomCode);
     
     // Controlla se questa vincita è già stata fatta
-    const alreadyMade = hasWinTypeBeenMade(roomCode, winData.type, winData.rowIndex);
+    const alreadyMade = hasWinTypeBeenMade(roomCode, winData.type);
     
     if (!alreadyMade) {
         winData.timestamp = new Date().toISOString();
@@ -286,66 +266,32 @@ function recordWin(roomCode, winData) {
     return false; // Vincita già fatta
 }
 
-// Controlla vincite per un giocatore
-function checkWinsForPlayer(player, roomCode, newNumber) {
-    const newWins = [];
+// Controlla se un giocatore ha fatto una vincita su una specifica riga
+function checkPlayerWin(player, winType, cardIndex, rowIndex) {
+    const card = player.cards[cardIndex];
+    if (!card) return false;
     
-    player.cards.forEach((card, cardIndex) => {
-        // Controlla ogni riga per ambo/terna/quaterna/cinquina
-        card.rows.forEach((row, rowIndex) => {
-            const markedInRow = row.filter(cell => cell && cell.marked).length;
-            
-            if (markedInRow >= 2) {
-                const winTypes = {
-                    2: 'ambo',
-                    3: 'terna', 
-                    4: 'quaterna',
-                    5: 'cinquina'
-                };
-                
-                const winType = winTypes[markedInRow];
-                if (winType) {
-                    // Controlla se questa vincita (tipo + riga) è già stata fatta
-                    if (!hasWinTypeBeenMade(roomCode, winType, rowIndex)) {
-                        const winData = {
-                            playerName: player.name,
-                            playerId: player.id,
-                            type: winType,
-                            cardIndex: cardIndex,
-                            rowIndex: rowIndex,
-                            number: newNumber
-                        };
-                        
-                        // Registra la vincita
-                        if (recordWin(roomCode, winData)) {
-                            newWins.push(winData);
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Controlla tombola (tutta la cartella)
-        const totalMarked = card.numbers.filter(num => num.marked).length;
-        if (totalMarked === 15) {
-            // Controlla se tombola è già stata fatta
-            if (!hasWinTypeBeenMade(roomCode, 'tombola')) {
-                const winData = {
-                    playerName: player.name,
-                    playerId: player.id,
-                    type: 'tombola',
-                    cardIndex: cardIndex,
-                    number: newNumber
-                };
-                
-                if (recordWin(roomCode, winData)) {
-                    newWins.push(winData);
-                }
-            }
-        }
-    });
+    const row = card.rows[rowIndex];
+    if (!row) return false;
     
-    return newWins;
+    const markedInRow = row.filter(cell => cell && cell.marked).length;
+    
+    // Controlla se corrisponde al tipo di vincita
+    switch(winType) {
+        case 'ambo':
+            return markedInRow === 2;
+        case 'terna':
+            return markedInRow === 3;
+        case 'quaterna':
+            return markedInRow === 4;
+        case 'cinquina':
+            return markedInRow === 5;
+        case 'tombola':
+            const totalMarked = card.numbers.filter(num => num.marked).length;
+            return totalMarked === 15;
+        default:
+            return false;
+    }
 }
 
 // WebSocket
@@ -394,7 +340,7 @@ io.on('connection', (socket) => {
         // Unisciti alla room socket
         socket.join(roomCode);
         
-        // Invia dati al giocatore (SOLO numero corrente, non tutti i numeri estratti)
+        // Invia dati al giocatore
         socket.emit('joined-room', {
             roomName: room.name,
             players: Array.from(room.players.values()).map(p => ({
@@ -495,9 +441,7 @@ io.on('connection', (socket) => {
         room.extractedNumbers.push(newNumber);
         room.lastNumber = newNumber;
         
-        // Aggiorna tutti i giocatori segnando i numeri
-        const allWins = [];
-        
+        // Segna il numero su tutte le cartelle dei giocatori
         room.players.forEach(player => {
             player.cards.forEach(card => {
                 card.numbers.forEach(numObj => {
@@ -507,10 +451,6 @@ io.on('connection', (socket) => {
                 });
             });
             player.markedCount = countMarkedNumbers(player);
-            
-            // Controlla vincite per questo giocatore
-            const playerWins = checkWinsForPlayer(player, roomCode, newNumber);
-            allWins.push(...playerWins);
         });
         
         // Invia a tutti nella stanza SOLO il numero corrente
@@ -519,26 +459,59 @@ io.on('connection', (socket) => {
             extractedCount: room.extractedNumbers.length
         });
         
-        // Notifica vincite (solo quelle nuove)
-        allWins.forEach(win => {
-            if (win.type === 'tombola') {
-                io.to(roomCode).emit('player-won', win);
-                io.to(`admin-${roomCode}`).emit('player-won', win);
-            } else {
-                // Per ambo/terna/quaterna/cinquina, notifica tutti
-                io.to(roomCode).emit('win-detected', win);
-                io.to(`admin-${roomCode}`).emit('win-detected', win);
-            }
-        });
-        
-        // Aggiorna admin con il numero estratto e storico vincite
+        // Aggiorna admin
         io.to(`admin-${roomCode}`).emit('number-extracted-admin', {
             number: newNumber,
-            extractedNumbers: room.extractedNumbers,
-            winHistory: winHistory.get(roomCode) || []
+            extractedNumbers: room.extractedNumbers
         });
         
         console.log(`Numero ${newNumber} estratto nella stanza ${roomCode}`);
+    });
+    
+    // Giocatore dichiara una vincita (MANUALE - quando clicca)
+    socket.on('declare-win', (data) => {
+        const { roomCode, winType, cardIndex, rowIndex } = data;
+        const player = players.get(socket.id);
+        const room = rooms.get(roomCode);
+        
+        if (!player || !room) {
+            socket.emit('win-error', 'Errore: giocatore o stanza non trovati');
+            return;
+        }
+        
+        // Controlla se questa vincita è già stata fatta da qualcuno
+        if (hasWinTypeBeenMade(roomCode, winType)) {
+            socket.emit('win-error', `${winType.toUpperCase()} è già stato fatto da un altro giocatore!`);
+            return;
+        }
+        
+        // Verifica che il giocatore abbia effettivamente fatto questa vincita
+        if (!checkPlayerWin(player, winType, cardIndex, rowIndex)) {
+            socket.emit('win-error', `Non hai fatto ${winType.toUpperCase()}!`);
+            return;
+        }
+        
+        // Registra la vincita
+        const winData = {
+            playerName: player.name,
+            playerId: player.id,
+            type: winType,
+            cardIndex: cardIndex,
+            rowIndex: rowIndex,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (recordWin(roomCode, winData)) {
+            // Notifica a TUTTI nella stanza
+            io.to(roomCode).emit('win-declared', winData);
+            
+            // Notifica admin
+            io.to(`admin-${roomCode}`).emit('win-declared', winData);
+            
+            console.log(`${player.name} ha fatto ${winType.toUpperCase()} nella stanza ${roomCode}`);
+        } else {
+            socket.emit('win-error', 'Errore nel registrare la vincita');
+        }
     });
     
     // Giocatore segna manualmente un numero
@@ -547,7 +520,10 @@ io.on('connection', (socket) => {
         const player = players.get(socket.id);
         const room = rooms.get(roomCode);
         
-        if (!player || !room) return;
+        if (!player || !room) {
+            socket.emit('mark-error', 'Errore: giocatore o stanza non trovati');
+            return;
+        }
         
         // Verifica che il numero sia stato estratto
         if (!room.extractedNumbers.includes(number)) {
@@ -567,26 +543,20 @@ io.on('connection', (socket) => {
         if (found) {
             player.markedCount = countMarkedNumbers(player);
             
-            // Controlla vincite
-            const wins = checkWinsForPlayer(player, roomCode, number);
-            
-            // Notifica vincite (solo quelle nuove)
-            wins.forEach(win => {
-                if (win.type === 'tombola') {
-                    io.to(roomCode).emit('player-won', win);
-                    io.to(`admin-${roomCode}`).emit('player-won', win);
-                } else {
-                    io.to(roomCode).emit('win-detected', win);
-                    io.to(`admin-${roomCode}`).emit('win-detected', win);
-                }
-            });
-            
             // Aggiorna admin
             io.to(`admin-${roomCode}`).emit('player-updated', {
                 playerId: socket.id,
                 markedCount: player.markedCount,
                 name: player.name
             });
+            
+            socket.emit('number-marked', {
+                cardIndex: cardIndex,
+                number: number,
+                success: true
+            });
+        } else {
+            socket.emit('mark-error', 'Numero non trovato o già segnato');
         }
     });
     
