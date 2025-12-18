@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Natalizia - Giocatore</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="snow-container"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-user-friends"></i> Area Giocatore</h1>
+            <p class="subtitle">Unisciti a una stanza e gioca alla tombola</p>
+            <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">
+                <i class="fas fa-home"></i> Torna alla Home
+            </a>
+        </div>
+        
+        <div id="join-section" class="form-container">
+            <h2 style="text-align: center; color: #ffcc00; margin-bottom: 30px;">
+                <i class="fas fa-sign-in-alt"></i> Unisciti a una Stanza
+            </h2>
+            
+            <div id="message" class="message" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="player-name"><i class="fas fa-user"></i> Il Tuo Nome</label>
+                <input type="text" id="player-name" class="form-control" placeholder="Come vuoi essere chiamato?">
+            </div>
+            
+            <div class="form-group">
+                <label for="room-code"><i class="fas fa-door-open"></i> Codice Stanza</label>
+                <input type="text" id="room-code" class="form-control" placeholder="Inserisci il codice della stanza" maxlength="6" style="text-transform: uppercase;">
+                <small style="color: #c9e4c5; display: block; margin-top: 5px;">Chiedi all'amministratore il codice della stanza</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="cards-count"><i class="fas fa-layer-group"></i> Numero di Cartelle</label>
+                <select id="cards-count" class="form-control">
+                    <option value="1" selected>1 cartella</option>
+                    <option value="2">2 cartelle</option>
+                    <option value="3">3 cartelle</option>
+                </select>
+            </div>
+            
+            <button id="join-btn" class="btn btn-player" style="width: 100%;">
+                <i class="fas fa-play-circle"></i> Unisciti e Gioca
+            </button>
+        </div>
+        
+        <div id="game-section" style="display: none;">
+            <div class="panel-section" style="margin-bottom: 30px;">
+                <h3><i class="fas fa-info-circle"></i> Informazioni Stanza</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 15px;">
+                    <div>
+                        <p><strong>Nome Stanza:</strong> <span id="room-name-display">-</span></p>
+                        <p><strong>Codice:</strong> <span id="room-code-display" style="font-weight: bold; color: #ffcc00;">-</span></p>
+                    </div>
+                    <div>
+                        <p><strong>Giocatori:</strong> <span id="room-players">-</span></p>
+                        <p><strong>Tu sei:</strong> <span id="player-name-display" style="color: #ffcc00;">-</span></p>
+                    </div>
+                    <div>
+                        <p><strong>Numeri estratti:</strong> <span id="extracted-count-display">0</span>/90</p>
+                        <p><strong>Ultimo numero:</strong> <span id="last-number-display" style="font-weight: bold; font-size: 1.2rem;">--</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel-section" style="margin-bottom: 30px;">
+                <h3><i class="fas fa-list-ol"></i> Numeri Estratti</h3>
+                <div id="player-extracted-numbers" class="numbers-grid">
+                    <!-- I numeri estratti appariranno qui -->
+                </div>
+            </div>
+            
+            <div id="tombola-cards-container">
+                <!-- Le cartelle del giocatore appariranno qui -->
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button id="leave-room-btn" class="btn btn-admin">
+                    <i class="fas fa-sign-out-alt"></i> Lascia la Stanza
+                </button>
+                <button id="check-winner-btn" class="btn btn-player">
+                    <i class="fas fa-trophy"></i> Controlla Vincita
+                </button>
+            </div>
+        </div>
+        
+        <footer class="footer">
+            <p>Tombola Natalizia - Area Giocatore | <span id="current-year"></span></p>
+        </footer>
+    </div>
+    
+    <script src="snow.js"></script>
+    <script src="player.js"></script>
+</body>
+</html>
