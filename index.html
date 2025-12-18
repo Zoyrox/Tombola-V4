@@ -1,1 +1,69 @@
-
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Natalizia - Benvenuto</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="snow-container"></div>
+    
+    <div class="container welcome-container">
+        <div class="header">
+            <h1><i class="fas fa-snowflake"></i> Tombola Natalizia <i class="fas fa-snowflake"></i></h1>
+            <p class="subtitle">Gioca alla tombola online con amici e famiglia!</p>
+        </div>
+        
+        <div class="welcome-content">
+            <div class="welcome-card">
+                <div class="card-icon">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <h2>Amministratore</h2>
+                <p>Crea una stanza, gestisci i giocatori e estrai i numeri.</p>
+                <a href="admin.html" class="btn btn-admin">Vai al Pannello Admin</a>
+            </div>
+            
+            <div class="welcome-card">
+                <div class="card-icon">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+                <h2>Giocatore</h2>
+                <p>Unisciti a una stanza e gioca con la tua scheda personale.</p>
+                <a href="player.html" class="btn btn-player">Vai al Pannello Giocatore</a>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3><i class="fas fa-info-circle"></i> Come funziona</h3>
+            <div class="steps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <p>L'amministratore crea una stanza e condivide il codice</p>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <p>I giocatori si uniscono alla stanza con il codice</p>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <p>L'amministratore estrae i numeri e i giocatori segnano le cartelle</p>
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <p>Il primo che completa la cartella vince!</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="footer">
+            <p>Made with <i class="fas fa-heart"></i> per il Natale 2023 | Hosted on Render.com</p>
+        </footer>
+    </div>
+    
+    <script src="snow.js"></script>
+</body>
+</html>
