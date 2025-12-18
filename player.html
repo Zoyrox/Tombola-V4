@@ -10,8 +10,23 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         .player-container {
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
+        }
+        
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .main-game {
+            grid-column: 1;
+        }
+        
+        .sidebar {
+            grid-column: 2;
         }
         
         .room-info-grid {
@@ -38,6 +53,108 @@
         .info-box span {
             font-size: 1.1rem;
             color: white;
+        }
+        
+        .current-number-container {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tombola-board {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tombola-board h3 {
+            color: #ffcc00;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .wins-history {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .wins-history h3 {
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .win-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid #ffcc00;
+        }
+        
+        .win-item.tombola {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .win-item.cinquina {
+            border-left-color: #ff9900;
+            background: rgba(255, 153, 0, 0.1);
+        }
+        
+        .win-item.quaterna {
+            border-left-color: #ffe66d;
+            background: rgba(255, 230, 109, 0.1);
+        }
+        
+        .win-item.terna {
+            border-left-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+        
+        .win-item.ambo {
+            border-left-color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+        }
+        
+        .win-player {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        
+        .win-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .win-tombola { background: #ff0000; color: white; }
+        .win-cinquina { background: #ff9900; color: white; }
+        .win-quaterna { background: #ffe66d; color: #333; }
+        .win-terna { background: #ff6b6b; color: white; }
+        .win-ambo { background: #4ecdc4; color: white; }
+        
+        @media (max-width: 1024px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-column: 1;
+            }
         }
     </style>
 </head>
@@ -111,26 +228,65 @@
                 </div>
             </div>
             
-            <!-- Numero estratto corrente -->
-            <div class="current-number-label">Ultimo Numero Estratto:</div>
-            <div class="current-number-display" id="last-number-display">
-                --
-            </div>
-            
-            <!-- Cartelle del giocatore -->
-            <h2 style="color: #ffcc00; margin: 30px 0 20px; text-align: center;">
-                <i class="fas fa-table"></i> Le Tue Cartelle
-            </h2>
-            
-            <div id="tombola-cards-container" class="cards-container">
-                <!-- Le cartelle appariranno qui -->
-            </div>
-            
-            <!-- Controllo vincita -->
-            <div style="text-align: center; margin-top: 40px;">
-                <button id="check-winner-btn" class="btn btn-player">
-                    <i class="fas fa-trophy"></i> Controlla Vincita
-                </button>
+            <div class="game-layout">
+                <div class="main-game">
+                    <!-- Numero estratto corrente -->
+                    <div class="current-number-container">
+                        <div class="current-number-label" style="font-size: 1.2rem; color: #c9e4c5; margin-bottom: 10px;">
+                            Ultimo Numero Estratto:
+                        </div>
+                        <div class="current-number-display" id="last-number-display" style="font-size: 6rem;">
+                            --
+                        </div>
+                        <div style="color: #c9e4c5; margin-top: 10px;">
+                            Numeri estratti: <span id="extracted-count-display" style="color: #ffcc00; font-weight: bold;">0</span>/90
+                        </div>
+                    </div>
+                    
+                    <!-- Tabellone numeri estratti -->
+                    <div class="tombola-board">
+                        <h3><i class="fas fa-th"></i> Tabellone Numeri Estratti</h3>
+                        <div id="tombola-board-grid" class="simple-grid" style="margin-top: 15px;">
+                            <!-- Il tabellone verrà generato qui -->
+                        </div>
+                    </div>
+                    
+                    <!-- Cartelle del giocatore -->
+                    <h2 style="color: #ffcc00; margin: 30px 0 20px;">
+                        <i class="fas fa-table"></i> Le Tue Cartelle
+                    </h2>
+                    
+                    <div id="tombola-cards-container" class="cards-container">
+                        <!-- Le cartelle appariranno qui -->
+                    </div>
+                    
+                    <!-- Controllo vincita -->
+                    <div style="text-align: center; margin-top: 40px;">
+                        <button id="check-winner-btn" class="btn btn-player">
+                            <i class="fas fa-trophy"></i> Controlla Vincite
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="sidebar">
+                    <!-- Giocatori online -->
+                    <div class="tombola-board">
+                        <h3><i class="fas fa-users"></i> Giocatori Online (<span id="players-count">0</span>)</h3>
+                        <div id="players-list" style="max-height: 200px; overflow-y: auto;">
+                            <p style="color: #c9e4c5; text-align: center;">Nessun giocatore</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Storico vincite -->
+                    <div class="wins-history">
+                        <h3><i class="fas fa-history"></i> Storico Vincite</h3>
+                        <div id="wins-history-list">
+                            <p style="color: #c9e4c5; text-align: center; font-style: italic;">
+                                Ancora nessuna vincita...
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
