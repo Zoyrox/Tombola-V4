@@ -459,3 +459,189 @@ body {
 .room-item:hover {
     transform: translateY(-5px);
 }
+
+
+/* Aggiungi alla fine del file */
+
+/* Stili per la tabella tombola divisa per decine */
+.tombola-table {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    margin-top: 15px;
+}
+
+.table-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table-cell.empty {
+    background: transparent;
+    border: none;
+}
+
+.table-cell.marked {
+    background: #009933;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+}
+
+/* Animazione per il numero appena estratto */
+@keyframes flash {
+    0%, 100% { 
+        background: #d40000;
+        box-shadow: 0 0 20px rgba(255, 204, 0, 0.8);
+    }
+    50% { 
+        background: #ffcc00;
+        box-shadow: 0 0 30px rgba(255, 204, 0, 1);
+        transform: scale(1.1);
+    }
+}
+
+.number-cell.just-extracted {
+    animation: flash 1s ease-in-out infinite;
+}
+
+/* Stili per il numero estratto nei giocatori */
+.current-number-display {
+    font-size: 5rem;
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 3px 3px 0 #d40000;
+    text-align: center;
+    margin: 20px 0;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.current-number-label {
+    text-align: center;
+    color: #c9e4c5;
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+/* Stili per la scheda tombola con griglia 3x9 */
+.tombola-sheet {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-top: 15px;
+}
+
+.sheet-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.sheet-cell:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.sheet-cell.marked {
+    background: #009933;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.sheet-cell.marked::after {
+    content: "✓";
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 0.8rem;
+    color: #ffcc00;
+}
+
+/* Layout per le cartelle dei giocatori */
+.cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.tombola-card {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 15px;
+    padding: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.tombola-card h3 {
+    color: #ffcc00;
+    margin-bottom: 15px;
+    font-size: 1.4rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* Stili per la tabella dei numeri estratti (admin) */
+.extracted-numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 6px;
+    margin-top: 15px;
+}
+
+.extracted-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.extracted-cell.extracted {
+    background: #d40000;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+}
+
+.extracted-cell:not(.extracted):hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Header per le decine nella tabella giocatore */
+.decade-header {
+    grid-column: span 10;
+    text-align: center;
+    color: #ffcc00;
+    font-weight: bold;
+    margin: 10px 0 5px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid rgba(255, 204, 0, 0.3);
+}
