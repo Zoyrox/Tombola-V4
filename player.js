@@ -54,6 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('player-won', handlePlayerWon);
     socket.on('extraction-reset', handleExtractionReset);
     socket.on('mark-error', handleMarkError);
+    socket.on('win-detected', handleWinDetected);
+    socket.on('player-cinquina', handlePlayerCinquina);
     
     // Funzione per unirsi a una stanza
     async function joinRoom() {
@@ -432,3 +434,296 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.head.appendChild(style);
 });
+
+
+// Aggiungi queste funzioni al player.js:
+
+// Gestione rilevamento vincite
+function handleWinDetected(data) {
+    const winMessages = {
+        'ambo': 'Ambo! Hai fatto 2 numeri su una riga!',
+        'terna': 'Terna! Hai fatto 3 numeri su una riga!',
+        'quaterna': 'Quaterna! Hai fatto 4 numeri su una riga!',
+        'cinquina': 'Cinquina! Hai completato una riga intera!'
+    };
+    
+    if (winMessages[data.type]) {
+        showMessage(`🎉 ${winMessages[data.type]}`, 'success');
+        
+        // Effetto visivo sulla riga vincente
+        highlightWinningRow(data.cardIndex, data.row);
+    }
+}
+
+// Gestione cinquina di altri giocatori
+function handlePlayerCinquina(data) {
+    if (data.playerName !== player.name) {
+        showMessage(`🎉 ${data.playerName} ha fatto CINQUINA nella cartella ${data.cardIndex + 1}!`, 'info');
+    }
+}
+
+// Funzione per evidenziare la riga vincente
+function highlightWinningRow(cardIndex, rowIndex) {
+    const grid = document.getElementById(`card-${cardIndex}`);
+    if (!grid) return;
+    
+    const cells = grid.querySelectorAll('.sheet-cell');
+    // Ogni riga ha 9 celle, quindi:
+    const startIndex = rowIndex * 9;
+    const endIndex = startIndex + 9;
+    
+    for (let i = startIndex; i < endIndex; i++) {
+        if (cells[i] && !cells[i].classList.contains('empty')) {
+            cells[i].style.animation = 'winning-pulse 2s';
+            setTimeout(() => {
+                if (cells[i]) cells[i].style.animation = '';
+            }, 2000);
+        }
+    }
+}
+
+// Modifica la funzione initCardGrid per gestire la griglia 3x9 correttamente:
+function initCardGrid(cardIndex) {
+    const grid = document.getElementById(`card-${cardIndex}`);
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    if (!player.cards[cardIndex] || !player.cards[cardIndex].rows) {
+        grid.innerHTML = '<div style="grid-column: span 9; text-align: center; color: #c9e4c5;">Caricamento...</div>';
+        return;
+    }
+    
+    const cardData = player.cards[cardIndex];
+    
+    // Crea la griglia 3x9
+    for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 9; col++) {
+            const cell = document.createElement('div');
+            cell.className = 'sheet-cell';
+            
+            const cellData = cardData.rows[row][col];
+            if (cellData) {
+                cell.textContent = cellData.number;
+                cell.id = `card-${cardIndex}-num-${cellData.number}`;
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                
+                if (cellData.marked) {
+                    cell.classList.add('marked');
+                }
+            } else {
+                cell.classList.add('empty');
+                cell.textContent = '';
+            }
+            
+            grid.appendChild(cell);
+        }
+    }
+    
+    // Aggiungi contatori per riga
+    addRowCounters(cardIndex);
+    updateCardCount(cardIndex);
+}
+
+// Funzione per aggiungere i contatori per riga
+function addRowCounters(cardIndex) {
+    const cardElement = document.querySelector(`#card-${cardIndex}`).closest('.tombola-card');
+    if (!cardElement) return;
+    
+    // Rimuovi contatori esistenti
+    const existingCounters = cardElement.querySelectorAll('.row-counter');
+    existingCounters.forEach(counter => counter.remove());
+    
+    // Crea contatori per ogni riga
+    const rowCounters = document.createElement('div');
+    rowCounters.style.display = 'flex';
+    rowCounters.style.justifyContent = 'space-around';
+    rowCounters.style.marginTop = '10px';
+    rowCounters.style.padding = '0 20px';
+    
+    for (let row = 0; row < 3; row++) {
+        const counter = document.createElement('div');
+        counter.className = 'row-counter';
+        counter.innerHTML = `
+            <div style="text-align: center;">
+                <div style="color: #c9e4c5; font-size: 0.8rem;">Riga ${row + 1}</div>
+                <div id="card-${cardIndex}-row-${row}-count" style="color: #ffcc00; font-weight: bold; font-size: 1.2rem;">0</div>
+                <div style="color: #c9e4c5; font-size: 0.7rem;">/5</div>
+            </div>
+        `;
+        rowCounters.appendChild(counter);
+    }
+    
+    cardElement.querySelector('.tombola-sheet').insertAdjacentElement('afterend', rowCounters);
+}
+
+// Aggiorna la funzione updateCardCount per contare anche per riga
+function updateCardCount(cardIndex) {
+    if (!player.cards[cardIndex]) return;
+    
+    const cardData = player.cards[cardIndex];
+    let totalMarked = 0;
+    const rowCounts = [0, 0, 0];
+    
+    // Conta numeri segnati totali e per riga
+    cardData.rows.forEach((row, rowIndex) => {
+        const markedInRow = row.filter(cell => cell && cell.marked).length;
+        rowCounts[rowIndex] = markedInRow;
+        totalMarked += markedInRow;
+        
+        // Aggiorna contatore riga
+        const rowCounter = document.getElementById(`card-${cardIndex}-row-${rowIndex}-count`);
+        if (rowCounter) {
+            rowCounter.textContent = markedInRow;
+            
+            // Evidenzia se la riga è completa (cinquina)
+            if (markedInRow === 5) {
+                rowCounter.style.color = '#ff0000';
+                rowCounter.style.fontWeight = 'bold';
+                rowCounter.innerHTML = `<span style="color: #ff0000;">${markedInRow} ✓</span>`;
+            }
+        }
+    });
+    
+    // Aggiorna contatore totale
+    const countElement = document.getElementById(`card-${cardIndex}-count`);
+    if (countElement) {
+        countElement.textContent = totalMarked;
+        
+        // Evidenzia se tombola (tutti i 15 numeri)
+        if (totalMarked === 15) {
+            countElement.style.color = '#ff0000';
+            countElement.style.fontWeight = 'bold';
+            countElement.innerHTML = `<span style="color: #ff0000;">${totalMarked} 🎉 TOMBOLA!</span>`;
+        }
+    }
+}
+
+// Modifica la funzione checkWinner per mostrare tutte le vincite
+function checkWinner() {
+    if (!player.isConnected) {
+        showMessage('Non sei connesso a una stanza', 'error');
+        return;
+    }
+    
+    let totalMarked = 0;
+    let winningCards = [];
+    let winningRows = {
+        ambo: [],
+        terna: [],
+        quaterna: [],
+        cinquina: [],
+        tombola: []
+    };
+    
+    player.cards.forEach((card, cardIndex) => {
+        const cardData = player.cards[cardIndex];
+        if (!cardData || !cardData.rows) return;
+        
+        let cardMarked = 0;
+        
+        // Controlla ogni riga
+        cardData.rows.forEach((row, rowIndex) => {
+            const markedInRow = row.filter(cell => cell && cell.marked).length;
+            cardMarked += markedInRow;
+            
+            // Rileva le vincite per riga
+            if (markedInRow >= 2) {
+                if (markedInRow === 2) {
+                    winningRows.ambo.push({ card: cardIndex + 1, row: rowIndex + 1 });
+                }
+                if (markedInRow === 3) {
+                    winningRows.terna.push({ card: cardIndex + 1, row: rowIndex + 1 });
+                }
+                if (markedInRow === 4) {
+                    winningRows.quaterna.push({ card: cardIndex + 1, row: rowIndex + 1 });
+                }
+                if (markedInRow === 5) {
+                    winningRows.cinquina.push({ card: cardIndex + 1, row: rowIndex + 1 });
+                }
+            }
+        });
+        
+        totalMarked += cardMarked;
+        
+        // Controlla tombola (tutta la cartella)
+        if (cardMarked === 15) {
+            winningRows.tombola.push(cardIndex + 1);
+            winningCards.push(cardIndex + 1);
+        }
+    });
+    
+    const totalNumbers = 15 * player.cardsCount;
+    
+    // Crea messaggio con tutte le vincite
+    let winMessage = '';
+    
+    if (winningRows.tombola.length > 0) {
+        winMessage += `🎉 TOMBOLA! Hai completato le cartelle: ${winningRows.tombola.join(', ')}!\n`;
+    }
+    
+    if (winningRows.cinquina.length > 0) {
+        winMessage += `🎯 Cinquina nelle cartelle: ${winningRows.cinquina.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+    }
+    
+    if (winningRows.quaterna.length > 0) {
+        winMessage += `⭐ Quaterna nelle cartelle: ${winningRows.quaterna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+    }
+    
+    if (winningRows.terna.length > 0) {
+        winMessage += `🔶 Terna nelle cartelle: ${winningRows.terna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+    }
+    
+    if (winningRows.ambo.length > 0) {
+        winMessage += `🔹 Ambo nelle cartelle: ${winningRows.ambo.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+    }
+    
+    if (winMessage) {
+        showMessage(winMessage, 'success');
+        
+        // Effetto speciale per vincite importanti
+        if (winningRows.tombola.length > 0 || winningRows.cinquina.length > 0) {
+            document.getElementById('game-section').style.animation = 'pulse 1s infinite';
+            setTimeout(() => {
+                document.getElementById('game-section').style.animation = '';
+            }, 5000);
+        }
+    } else {
+        showMessage(`Hai segnato ${totalMarked} numeri su ${totalNumbers}. Continua così!`, 'info');
+    }
+}
+
+// Aggiungi questo stile CSS per le animazioni
+const winStyle = document.createElement('style');
+winStyle.textContent = `
+    @keyframes winning-pulse {
+        0%, 100% { 
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+        }
+        50% { 
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.9);
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+        }
+    }
+    
+    .sheet-cell.marked.winning {
+        background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
+        color: #000 !important;
+        font-weight: bold;
+        animation: winning-pulse 2s infinite;
+    }
+    
+    .row-counter div:first-child {
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+    }
+    
+    .row-counter div:nth-child(2) {
+        font-size: 1.3rem;
+        font-weight: bold;
+    }
+`;
+document.head.appendChild(winStyle);
