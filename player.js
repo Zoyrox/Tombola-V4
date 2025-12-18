@@ -304,50 +304,70 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    function checkWinner() {
-    if (!player.isConnected) {
-        showMessage('Non sei connesso a una stanza', 'error');
-        return;
-    }
-    
-    let message = 'Controlla le tue cartelle:\n\n';
-    let hasWins = false;
-    
-    player.cards.forEach((card, cardIndex) => {
-        // Controlla tombola
-        const totalMarked = card.numbers.filter(num => num.marked).length;
-        if (totalMarked === 15) {
-            message += `🎉 Cartella ${cardIndex + 1}: TOMBOLA possibile!\n`;
-            hasWins = true;
+        function checkWinner() {
+        if (!player.isConnected) {
+            showMessage('Non sei connesso a una stanza', 'error');
+            return;
         }
         
-        // Controlla ogni riga
-        card.rows.forEach((row, rowIndex) => {
-            const markedInRow = row.filter(cell => cell && cell.marked).length;
+        let totalMarked = 0;
+        let possibleWins = [];
+        
+        player.cards.forEach((card, cardIndex) => {
+            // Controlla tombola
+            const cardMarked = card.numbers.filter(num => num.marked).length;
+            totalMarked += cardMarked;
             
-            if (markedInRow >= 2) {
-                const winTypes = {
-                    2: 'Ambo',
-                    3: 'Terna',
-                    4: 'Quaterna',
-                    5: 'Cinquina'
-                };
-                
-                if (winTypes[markedInRow]) {
-                    message += `✅ Cartella ${cardIndex + 1}, Riga ${rowIndex + 1}: ${winTypes[markedInRow]} possibile (${markedInRow}/5 numeri)\n`;
-                    hasWins = true;
-                }
+            if (cardMarked === 15) {
+                possibleWins.push(`🎉 Cartella ${cardIndex + 1}: TOMBOLA!`);
             }
+            
+            // Controlla ogni riga
+            card.rows.forEach((row, rowIndex) => {
+                const markedInRow = row.filter(cell => cell && cell.marked).length;
+                
+                if (markedInRow >= 2) {
+                    const winTypes = {
+                        2: 'Ambo',
+                        3: 'Terna',
+                        4: 'Quaterna', 
+                        5: 'Cinquina'
+                    };
+                    
+                    if (winTypes[markedInRow]) {
+                        // Controlla se questa vincita è già stata fatta da qualcuno
+                        const alreadyMade = room.winHistory.some(win => win.type === winTypes[markedInRow].toLowerCase());
+                        
+                        if (!alreadyMade) {
+                            possibleWins.push(`✅ Cartella ${cardIndex + 1}, Riga ${rowIndex + 1}: ${winTypes[markedInRow]} possibile`);
+                        }
+                    }
+                }
+            });
         });
-    });
-    
-    if (hasWins) {
-        message += '\n⚠️ Usa i pulsanti sotto ogni cartella per dichiarare le vincite!';
-        showMessage(message, 'info');
-    } else {
-        showMessage('Nessuna vincita possibile al momento. Continua a giocare!', 'info');
+        
+        if (possibleWins.length > 0) {
+            let message = 'Situazione attuale:\n\n';
+            message += possibleWins.join('\n');
+            
+            // Aggiungi info sulle vincite già fatte
+            const madeWins = room.winHistory.filter(win => win.playerName === player.name);
+            if (madeWins.length > 0) {
+                message += '\n\n🎯 Vincite che hai già fatto:';
+                madeWins.forEach(win => {
+                    if (win.type === 'tombola') {
+                        message += `\n• ${win.type.toUpperCase()} (Cartella ${win.cardIndex + 1})`;
+                    } else {
+                        message += `\n• ${win.type.toUpperCase()} (Cartella ${win.cardIndex + 1}, Riga ${win.rowIndex + 1})`;
+                    }
+                });
+            }
+            
+            showMessage(message, 'info');
+        } else {
+            showMessage(`Hai segnato ${totalMarked} numeri su ${15 * player.cardsCount}. Continua così!`, 'info');
+        }
     }
-}
     
     // Aggiorna storico vincite
     function updateWinHistory() {
@@ -441,8 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Funzione per generare le cartelle visuali
-    function generatePlayerCards() {
+        function generatePlayerCards() {
         const container = document.getElementById('tombola-cards-container');
         if (!container) return;
         
@@ -468,12 +487,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span style="color: #c9e4c5;">Numeri segnati: </span>
                     <span id="card-${cardIndex}-count" style="color: #ffcc00; font-weight: bold;">0</span>/15
                 </div>
+                <div style="text-align: center; margin-top: 10px; color: #c9e4c5; font-size: 0.9rem;">
+                    <i class="fas fa-mouse-pointer"></i> Doppio click su un numero per segnarlo
+                </div>
             `;
             
             container.appendChild(cardElement);
             initCardGrid(cardIndex);
         });
     }
+
     
     // Funzione per inizializzare la griglia di una cartella
     function initCardGrid(cardIndex) {
@@ -546,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Funzione per segnare manualmente un numero
     // Sostituisci la funzione markNumberManual con questa:
 
-    // Funzione per segnare manualmente un numero
+   // Funzione per segnare manualmente un numero
     async function markNumberManual(cardIndex, number) {
         if (!player.isConnected) return;
         
@@ -598,6 +621,59 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Gestione evento quando il server conferma che un numero è stato segnato
+    socket.on('number-marked', function(data) {
+        if (data.success) {
+            // Il numero è già stato segnato dal server, non serve fare nulla
+            console.log(`Numero ${data.number} segnato con successo`);
+        }
+    });
+    
+    // Gestione vincite automatiche rilevate dal server
+    socket.on('win-detected', function(data) {
+        // Aggiungi allo storico
+        room.winHistory.push(data);
+        updateWinHistory();
+        
+        const winMessages = {
+            'ambo': 'AMBO',
+            'terna': 'TERNA', 
+            'quaterna': 'QUATERNA',
+            'cinquina': 'CINQUINA'
+        };
+        
+        if (data.playerName === player.name) {
+            showMessage(`🎉 HAI FATTO ${winMessages[data.type]}! Sei il primo! 🎉`, 'success');
+            
+            // Evidenzia la riga vincente
+            highlightWinningRow(data.cardIndex, data.rowIndex, data.type);
+        } else {
+            showMessage(`🎉 ${data.playerName} ha fatto ${winMessages[data.type]}!`, 'info');
+        }
+    });
+    
+    socket.on('player-won', function(data) {
+        // Aggiungi allo storico
+        room.winHistory.push(data);
+        updateWinHistory();
+        
+        if (data.playerName === player.name) {
+            showMessage(`🎉 COMPLIMENTI! HAI FATTO TOMBOLA! 🎉`, 'success');
+            
+            // Evidenzia la cartella vincente
+            const cardElement = document.querySelector(`#card-${data.cardIndex}`).closest('.tombola-card');
+            if (cardElement) {
+                cardElement.classList.add('card-complete');
+                cardElement.style.animation = 'tombola-pulse 1s infinite';
+                setTimeout(() => {
+                    cardElement.style.animation = '';
+                }, 5000);
+            }
+        } else {
+            showMessage(`🎉 ${data.playerName} HA FATTO TOMBOLA! 🎉`, 'success');
+        }
+    });
+        
     // Funzione per aggiungere i contatori per riga
     function addRowCounters(cardIndex) {
         const countersContainer = document.getElementById(`row-counters-${cardIndex}`);
