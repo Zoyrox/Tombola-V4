@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastExtractedNumber = null;
     let autoExtractInterval = null;
     let players = [];
+    let winHistory = [];
     
     // Elementi DOM
     const logoutBtn = document.getElementById('logout-btn');
@@ -61,6 +62,124 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('extraction-reset-admin', handleExtractionReset);
     socket.on('admin-room-data', handleAdminRoomData);
     socket.on('extraction-error', handleExtractionError);
+    socket.on('win-detected', handleWinDetected);
+    socket.on('player-won', handlePlayerWon);
+
+    function handleWinDetected(data) {
+        winHistory.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        updateWinHistory();
+        
+        // Notifica admin
+        const winMessages = {
+            'ambo': 'Ambo',
+            'terna': 'Terna',
+            'quaterna': 'Quaterna',
+            'cinquina': 'Cinquina',
+            'tombola': 'TOMBOLA'
+        };
+        
+        showMessage(`${data.playerName} ha fatto ${winMessages[data.type]}!`, 'success');
+    }
+        
+    function handlePlayerWon(data) {
+        winHistory.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        updateWinHistory();
+        
+        showMessage(`🎉 ${data.playerName} HA FATTO TOMBOLA! 🎉`, 'success');
+    }
+    
+    // Funzione per aggiornare storico vincite
+    function updateWinHistory() {
+        const winsContainer = document.getElementById('wins-history');
+        if (!winsContainer) return;
+        
+        if (winHistory.length === 0) {
+            winsContainer.innerHTML = '<p style="color: #c9e4c5; text-align: center; font-style: italic;">Ancora nessuna vincita...</p>';
+            return;
+        }
+        
+        // Ordina per timestamp (più recenti prima)
+        const sortedWins = [...winHistory].sort((a, b) => {
+            return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        });
+        
+        winsContainer.innerHTML = '';
+        
+        sortedWins.slice(0, 15).forEach(win => {
+            const winItem = document.createElement('div');
+            winItem.style.padding = '10px';
+            winItem.style.marginBottom = '8px';
+            winItem.style.background = 'rgba(255,255,255,0.05)';
+            winItem.style.borderRadius = '6px';
+            winItem.style.borderLeft = '4px solid';
+            
+            // Colore in base al tipo di vincita
+            const borderColors = {
+                'tombola': '#ff0000',
+                'cinquina': '#ff9900',
+                'quaterna': '#ffe66d',
+                'terna': '#ff6b6b',
+                'ambo': '#4ecdc4'
+            };
+            
+            winItem.style.borderLeftColor = borderColors[win.type] || '#ffcc00';
+            
+            const time = win.timestamp ? new Date(win.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Ora';
+            
+            let winText = '';
+            if (win.type === 'tombola') {
+                winText = `<strong style="color: #ffcc00;">${win.playerName}</strong> ha fatto <span style="color: #ff0000; font-weight: bold;">TOMBOLA</span>!`;
+            } else {
+                winText = `<strong style="color: #ffcc00;">${win.playerName}</strong> ha fatto <span style="color: ${borderColors[win.type]}; font-weight: bold;">${win.type.toUpperCase()}</span>`;
+                if (win.cardIndex !== undefined && win.rowIndex !== undefined) {
+                    winText += ` (Cartella ${win.cardIndex + 1}, Riga ${win.rowIndex + 1})`;
+                }
+            }
+            
+            winItem.innerHTML = `
+                <div style="font-size: 0.8rem; color: #c9e4c5; margin-bottom: 2px;">${time}</div>
+                <div>${winText}</div>
+            `;
+            
+            winsContainer.appendChild(winItem);
+        });
+    }
+    
+    // Aggiungi anche al handleAdminRoomData:
+    function handleAdminRoomData(data) {
+        players = data.players || [];
+        extractedNumbers = data.extractedNumbers || [];
+        lastExtractedNumber = data.lastNumber;
+        winHistory = data.winHistory || [];
+        
+        updateExtractedNumbersGrid();
+        updateExtractionProgress();
+        updatePlayersList();
+        updateWinHistory();
+        
+        if (data.lastNumber) {
+            updateExtractedNumberDisplay(data.lastNumber);
+        }
+    }
+    
+    // Aggiungi al handleExtractionReset:
+    function handleExtractionReset() {
+        extractedNumbers = [];
+        lastExtractedNumber = null;
+        winHistory = [];
+        
+        updateExtractedNumberDisplay('--');
+        updateExtractedNumbersGrid();
+        updateExtractionProgress();
+        updateWinHistory();
+        showMessage('Estrazione resettata', 'info');
+    }
     
     // Funzione per creare una stanza
     function createRoom() {
