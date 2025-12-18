@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Natalizia - Giocatore</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .player-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .main-game {
+            grid-column: 1;
+        }
+        
+        .sidebar {
+            grid-column: 2;
+        }
+        
+        .room-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .info-box strong {
+            color: #ffcc00;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .info-box span {
+            font-size: 1.1rem;
+            color: white;
+        }
+        
+        .current-number-container {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .wins-history {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .wins-history h3 {
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .win-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid #ffcc00;
+        }
+        
+        .win-item.tombola {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .win-item.cinquina {
+            border-left-color: #ff9900;
+            background: rgba(255, 153, 0, 0.1);
+        }
+        
+        .win-item.quaterna {
+            border-left-color: #ffe66d;
+            background: rgba(255, 230, 109, 0.1);
+        }
+        
+        .win-item.terna {
+            border-left-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+        
+        .win-item.ambo {
+            border-left-color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+        }
+        
+        .win-player {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        
+        .win-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .win-tombola { background: #ff0000; color: white; }
+        .win-cinquina { background: #ff9900; color: white; }
+        .win-quaterna { background: #ffe66d; color: #333; }
+        .win-terna { background: #ff6b6b; color: white; }
+        .win-ambo { background: #4ecdc4; color: white; }
+        
+        .game-instructions {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .game-instructions h3 {
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .instruction-item {
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 3px solid rgba(255, 204, 0, 0.5);
+        }
+        
+        .instruction-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .instruction-item strong {
+            color: #ffcc00;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .instruction-item p {
+            color: #c9e4c5;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+        
+        @media (max-width: 1024px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-column: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="snow-container"></div>
+    
+    <div class="container player-container">
+        <div class="header">
+            <h1><i class="fas fa-user-friends"></i> Area Giocatore</h1>
+            <p class="subtitle">Unisciti a una stanza e gioca alla tombola</p>
+            <div style="margin-top: 15px;">
+                <a href="index.html" class="btn btn-secondary">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <button id="leave-room-btn" class="btn btn-admin" style="display: none;">
+                    <i class="fas fa-sign-out-alt"></i> Lascia Stanza
+                </button>
+            </div>
+        </div>
+        
+        <div id="join-section" class="form-container">
+            <h2 style="text-align: center; color: #ffcc00; margin-bottom: 30px;">
+                <i class="fas fa-sign-in-alt"></i> Unisciti a una Stanza
+            </h2>
+            
+            <div id="message" class="message" style="display: none;"></div>
+            
+            <div class="form-group">
+                <label for="player-name"><i class="fas fa-user"></i> Il Tuo Nome</label>
+                <input type="text" id="player-name" class="form-control" placeholder="Come vuoi essere chiamato?">
+            </div>
+            
+            <div class="form-group">
+                <label for="room-code"><i class="fas fa-door-open"></i> Codice Stanza</label>
+                <input type="text" id="room-code" class="form-control" placeholder="Inserisci il codice della stanza" maxlength="6" style="text-transform: uppercase; font-size: 1.2rem; font-weight: bold; text-align: center;">
+                <small style="color: #c9e4c5; display: block; margin-top: 5px;">Chiedi all'amministratore il codice della stanza</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="cards-count"><i class="fas fa-layer-group"></i> Numero di Cartelle</label>
+                <select id="cards-count" class="form-control">
+                    <option value="1" selected>1 cartella</option>
+                    <option value="2">2 cartelle</option>
+                    <option value="3">3 cartelle</option>
+                </select>
+            </div>
+            
+            <button id="join-btn" class="btn btn-player" style="width: 100%;">
+                <i class="fas fa-play-circle"></i> Unisciti e Gioca
+            </button>
+        </div>
+        
+        <div id="game-section" style="display: none;">
+            <!-- Informazioni stanza -->
+            <div class="room-info-grid">
+                <div class="info-box">
+                    <strong>Nome Stanza</strong>
+                    <span id="room-name-display">-</span>
+                </div>
+                <div class="info-box">
+                    <strong>Codice Stanza</strong>
+                    <span id="room-code-display" style="color: #ffcc00;">-</span>
+                </div>
+                <div class="info-box">
+                    <strong>Il tuo Nome</strong>
+                    <span id="player-name-display" style="color: #ffcc00;">-</span>
+                </div>
+                <div class="info-box">
+                    <strong>Giocatori Online</strong>
+                    <span id="room-players">-</span>
+                </div>
+            </div>
+            
+            <div class="game-instructions">
+                <h3><i class="fas fa-info-circle"></i> Come Giocare</h3>
+                <div class="instruction-item">
+                    <strong>Numeri Estratti</strong>
+                    <p>Vedi solo l'ultimo numero estratto. I numeri precedenti non vengono mostrati.</p>
+                </div>
+                <div class="instruction-item">
+                    <strong>Segnare Numeri</strong>
+                    <p>I numeri vengono segnati automaticamente sulle tue cartelle. Doppio click su un numero per segnarlo manualmente (se già estratto).</p>
+                </div>
+                <div class="instruction-item">
+                    <strong>Vincite</strong>
+                    <p>Ambo (2 numeri su una riga), Terna (3), Quaterna (4), Cinquina (5 numeri su una riga), Tombola (tutta la cartella). Ogni vincita può essere fatta solo una volta per riga!</p>
+                </div>
+            </div>
+            
+            <div class="game-layout">
+                <div class="main-game">
+                    <!-- Numero estratto corrente -->
+                    <div class="current-number-container">
+                        <div class="current-number-label" style="font-size: 1.2rem; color: #c9e4c5; margin-bottom: 10px;">
+                            Ultimo Numero Estratto:
+                        </div>
+                        <div class="current-number-display" id="last-number-display" style="font-size: 6rem;">
+                            --
+                        </div>
+                        <div style="color: #c9e4c5; margin-top: 10px;">
+                            Numeri estratti: <span id="extracted-count-display" style="color: #ffcc00; font-weight: bold;">0</span>/90
+                        </div>
+                    </div>
+                    
+                    <!-- Cartelle del giocatore -->
+                    <h2 style="color: #ffcc00; margin: 30px 0 20px;">
+                        <i class="fas fa-table"></i> Le Tue Cartelle
+                    </h2>
+                    
+                    <div id="tombola-cards-container" class="cards-container">
+                        <!-- Le cartelle appariranno qui -->
+                    </div>
+                    
+                    <!-- Controllo vincita -->
+                    <div style="text-align: center; margin-top: 40px;">
+                        <button id="check-winner-btn" class="btn btn-player">
+                            <i class="fas fa-trophy"></i> Controlla Vincite
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="sidebar">
+                    <!-- Giocatori online -->
+                    <div class="wins-history">
+                        <h3><i class="fas fa-users"></i> Giocatori Online (<span id="players-count">0</span>)</h3>
+                        <div id="players-list" style="max-height: 200px; overflow-y: auto;">
+                            <p style="color: #c9e4c5; text-align: center;">Nessun giocatore</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Storico vincite -->
+                    <div class="wins-history">
+                        <h3><i class="fas fa-history"></i> Storico Vincite</h3>
+                        <div id="wins-history-list">
+                            <p style="color: #c9e4c5; text-align: center; font-style: italic;">
+                                Ancora nessuna vincita...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="footer" style="margin-top: 50px;">
+            <p>Tombola Natalizia - Area Giocatore | <span id="current-year"></span></p>
+        </footer>
+    </div>
+    
+    <script src="snow.js"></script>
+    <script src="player.js"></script>
+</body>
+</html>

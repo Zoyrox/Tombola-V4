@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Natalizia - Login Admin</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            max-width: 450px;
+            width: 100%;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .login-header h1 {
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 3rem;
+            color: #ffcc00;
+            text-shadow: 3px 3px 0 #d40000;
+            margin-bottom: 15px;
+        }
+        
+        .login-header p {
+            color: #c9e4c5;
+            font-size: 1.1rem;
+        }
+        
+        .back-home {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="snow-container"></div>
+    
+    <div class="login-page">
+        <div class="container login-container">
+            <div class="login-header">
+                <h1><i class="fas fa-lock"></i> Accesso Admin</h1>
+                <p>Accedi al pannello di amministrazione</p>
+            </div>
+            
+            <div id="login-section" class="form-container">
+                <div id="message" class="message" style="display: none;"></div>
+                
+                <div class="form-group">
+                    <label for="admin-email"><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="admin-email" class="form-control" placeholder="admin@tombola.it">
+                </div>
+                
+                <div class="form-group">
+                    <label for="admin-password"><i class="fas fa-key"></i> Password</label>
+                    <input type="password" id="admin-password" class="form-control" placeholder="Inserisci la password">
+                </div>
+                
+                <button id="login-btn" class="btn btn-admin" style="width: 100%; margin-top: 20px;">
+                    <i class="fas fa-sign-in-alt"></i> Accedi
+                </button>
+                
+                <div style="text-align: center; margin-top: 20px; color: #c9e4c5; font-size: 0.9rem;">
+                    <p>Le credenziali sono configurate nelle variabili d'ambiente del server</p>
+                </div>
+            </div>
+            
+            <div class="back-home">
+                <a href="index.html" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Torna alla Home
+                </a>
+            </div>
+            
+            <footer class="footer" style="margin-top: 50px;">
+                <p>Pannello Amministratore | Tombola Natalizia</p>
+            </footer>
+        </div>
+    </div>
+    
+    <script src="snow.js"></script>
+    <script>
+        // Script per il login admin
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginBtn = document.getElementById('login-btn');
+            const messageDiv = document.getElementById('message');
+            
+            loginBtn.addEventListener('click', handleLogin);
+            
+            // Permetti login con Enter
+            document.getElementById('admin-password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') handleLogin();
+            });
+            
+            async function handleLogin() {
+                const email = document.getElementById('admin-email').value;
+                const password = document.getElementById('admin-password').value;
+                
+                if (!email || !password) {
+                    showMessage('Inserisci email e password', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/admin/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Salva token e reindirizza
+                        localStorage.setItem('adminToken', data.token);
+                        window.location.href = 'admin.html';
+                    } else {
+                        showMessage('Credenziali non valide', 'error');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    showMessage('Errore di connessione al server', 'error');
+                }
+            }
+            
+            function showMessage(text, type) {
+                messageDiv.textContent = text;
+                messageDiv.className = `message ${type}`;
+                messageDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
