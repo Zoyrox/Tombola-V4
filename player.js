@@ -1,4 +1,4 @@
-// Giocatore Tombola Natalizia - Versione corretta per cartelle 3x9
+// Giocatore Tombola Natalizia
 document.addEventListener('DOMContentLoaded', function() {
     // Imposta anno corrente
     document.getElementById('current-year').textContent = new Date().getFullYear();
@@ -52,10 +52,9 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('player-left', handlePlayerLeft);
     socket.on('number-extracted', handleNumberExtracted);
     socket.on('player-won', handlePlayerWon);
-    socket.on('extraction-reset', handleExtractionReset);
-    socket.on('mark-error', handleMarkError);
-    socket.on('win-detected', handleWinDetected);
     socket.on('player-cinquina', handlePlayerCinquina);
+    socket.on('win-detected', handleWinDetected);
+    socket.on('extraction-reset', handleExtractionReset);
     
     // Funzione per unirsi a una stanza
     async function joinRoom() {
@@ -126,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aggiorna le informazioni
         updateRoomInfo();
         
-        // Genera le cartelle visuali (ora correttamente)
+        // Genera le cartelle visuali
         generatePlayerCards();
         
         showMessage(`Benvenuto ${player.name}! Ti sei unito alla stanza ${player.roomCode}`, 'success');
@@ -191,27 +190,9 @@ document.addEventListener('DOMContentLoaded', function() {
             numberDisplay.style.animation = '';
         }, 1000);
         
-        // Verifica se il numero è nelle tue cartelle
-        player.cards.forEach((card, cardIndex) => {
-            const numberObj = card.find(num => num.number === data.number);
-            if (numberObj && !numberObj.marked) {
-                // Segna automaticamente il numero
-                numberObj.marked = true;
-                
-                // Aggiorna la visualizzazione della cartella
-                const cell = document.getElementById(`card-${cardIndex}-num-${numberObj.number}`);
-                if (cell) {
-                    cell.classList.add('marked');
-                    cell.style.animation = 'pulse 0.5s';
-                    setTimeout(() => {
-                        cell.style.animation = '';
-                    }, 500);
-                }
-                
-                // Aggiorna il conteggio
-                updateCardCount(cardIndex);
-            }
-        });
+        // Aggiorna le cartelle - i numeri vengono segnati automaticamente dal server
+        // Qui aggiorniamo solo la visualizzazione
+        updateAllCardsDisplay();
         
         showMessage(`Numero ${data.number} estratto!`, 'info');
     }
@@ -222,12 +203,82 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Reset cartelle
         player.cards.forEach(card => {
-            card.forEach(num => num.marked = false);
+            card.numbers.forEach(num => num.marked = false);
         });
         
         updateRoomInfo();
         generatePlayerCards(); // Rigenera le cartelle visive
         showMessage('Estrazione resettata dall\'amministratore', 'info');
+    }
+    
+    // Gestione vincita di un giocatore
+    function handlePlayerWon(data) {
+        if (data.playerName === player.name) {
+            showMessage(`🎉 COMPLIMENTI! HAI FATTO TOMBOLA! Cartella ${data.cardIndex + 1} completata! 🎉`, 'success');
+            
+            // Evidenzia la cartella vincente
+            const cardElement = document.querySelector(`#card-${data.cardIndex}`).closest('.tombola-card');
+            if (cardElement) {
+                cardElement.classList.add('card-complete');
+                cardElement.style.animation = 'pulse 1s infinite';
+                setTimeout(() => {
+                    cardElement.style.animation = '';
+                }, 5000);
+            }
+        } else {
+            showMessage(`🎉 ${data.playerName} HA FATTO TOMBOLA! 🎉`, 'success');
+        }
+    }
+    
+    // Gestione cinquina di altri giocatori
+    function handlePlayerCinquina(data) {
+        if (data.playerName !== player.name) {
+            showMessage(`🎉 ${data.playerName} ha fatto CINQUINA!`, 'info');
+        }
+    }
+    
+    // Gestione rilevamento vincite
+    function handleWinDetected(data) {
+        const winMessages = {
+            'ambo': 'Ambo! 2 numeri su una riga!',
+            'terna': 'Terna! 3 numeri su una riga!',
+            'quaterna': 'Quaterna! 4 numeri su una riga!',
+            'cinquina': 'CINQUINA! Riga completata!'
+        };
+        
+        if (winMessages[data.type]) {
+            const message = data.type === 'cinquina' && data.playerName === player.name 
+                ? `🎉 HAI FATTO ${winMessages[data.type].toUpperCase()}!` 
+                : `🎉 ${winMessages[data.type]}`;
+            
+            showMessage(message, 'success');
+            
+            // Evidenzia la riga vincente
+            highlightWinningRow(data.cardIndex, data.row, data.type);
+        }
+    }
+    
+    // Funzione per evidenziare la riga vincente
+    function highlightWinningRow(cardIndex, rowIndex, winType) {
+        const grid = document.getElementById(`card-${cardIndex}`);
+        if (!grid) return;
+        
+        const cells = grid.querySelectorAll('.sheet-cell');
+        const startIndex = rowIndex * 9;
+        
+        for (let i = startIndex; i < startIndex + 9; i++) {
+            if (cells[i] && !cells[i].classList.contains('empty')) {
+                // Aggiungi classe in base al tipo di vincita
+                cells[i].classList.add(`win-${winType}`);
+                cells[i].style.animation = 'winning-pulse 2s';
+                
+                // Rimuovi dopo 3 secondi
+                setTimeout(() => {
+                    cells[i].classList.remove(`win-${winType}`);
+                    cells[i].style.animation = '';
+                }, 3000);
+            }
+        }
     }
     
     // Funzione per controllare vincita
@@ -238,58 +289,77 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         let totalMarked = 0;
-        let winningCards = [];
+        const wins = {
+            ambo: [],
+            terna: [],
+            quaterna: [],
+            cinquina: [],
+            tombola: []
+        };
         
-        player.cards.forEach((card, index) => {
-            const markedInCard = card.filter(num => num.marked).length;
-            totalMarked += markedInCard;
+        player.cards.forEach((card, cardIndex) => {
+            // Controlla tombola
+            const cardMarked = card.numbers.filter(num => num.marked).length;
+            totalMarked += cardMarked;
             
-            if (markedInCard === 15) {
-                winningCards.push(index + 1);
+            if (cardMarked === 15) {
+                wins.tombola.push(cardIndex + 1);
+            }
+            
+            // Controlla vincite per riga
+            if (card.rows) {
+                card.rows.forEach((row, rowIndex) => {
+                    const markedInRow = row.filter(cell => cell && cell.marked).length;
+                    
+                    if (markedInRow >= 2) {
+                        if (markedInRow === 2) wins.ambo.push({card: cardIndex + 1, row: rowIndex + 1});
+                        if (markedInRow === 3) wins.terna.push({card: cardIndex + 1, row: rowIndex + 1});
+                        if (markedInRow === 4) wins.quaterna.push({card: cardIndex + 1, row: rowIndex + 1});
+                        if (markedInRow === 5) wins.cinquina.push({card: cardIndex + 1, row: rowIndex + 1});
+                    }
+                });
             }
         });
         
-        const totalNumbers = 15 * player.cardsCount;
+        // Costruisci messaggio
+        let message = '';
         
-        if (winningCards.length > 0) {
-            showMessage(`🎉 COMPLIMENTI! Hai completato la cartella ${winningCards.join(', ')}! HAI VINTO! 🎉`, 'success');
-            
-            // Effetto speciale
-            document.getElementById('game-section').style.animation = 'pulse 1s infinite';
-            setTimeout(() => {
-                document.getElementById('game-section').style.animation = '';
-            }, 5000);
+        if (wins.tombola.length > 0) {
+            message += `🎉 TOMBOLA! Cartelle: ${wins.tombola.join(', ')}\n`;
+        }
+        
+        if (wins.cinquina.length > 0) {
+            message += `🎯 Cinquina: ${wins.cinquina.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+        }
+        
+        if (wins.quaterna.length > 0) {
+            message += `⭐ Quaterna: ${wins.quaterna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+        }
+        
+        if (wins.terna.length > 0) {
+            message += `🔶 Terna: ${wins.terna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+        }
+        
+        if (wins.ambo.length > 0) {
+            message += `🔹 Ambo: ${wins.ambo.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
+        }
+        
+        if (message) {
+            showMessage(message, 'success');
         } else {
-            showMessage(`Hai segnato ${totalMarked} numeri su ${totalNumbers}. Continua così!`, 'info');
+            showMessage(`Hai segnato ${totalMarked} numeri su ${15 * player.cardsCount}`, 'info');
         }
     }
     
-    // Gestione vincita di un giocatore
-    function handlePlayerWon(data) {
-        if (data.playerName === player.name) {
-            showMessage(`🎉 COMPLIMENTI! Hai completato la cartella ${data.cardIndex + 1}! HAI VINTO! 🎉`, 'success');
-            
-            document.getElementById('game-section').style.animation = 'pulse 1s infinite';
-            setTimeout(() => {
-                document.getElementById('game-section').style.animation = '';
-            }, 5000);
-        } else {
-            showMessage(`🎉 ${data.playerName} HA VINTO completando una cartella! 🎉`, 'success');
-        }
-    }
-    
-    // Gestione errore segnatura
-    function handleMarkError(error) {
-        showMessage(error, 'error');
-    }
-    
-    // Funzione per generare le cartelle visuali CORRETTE (griglia 3x9)
+    // Funzione per generare le cartelle visuali
     function generatePlayerCards() {
         const container = document.getElementById('tombola-cards-container');
+        if (!container) return;
+        
         container.innerHTML = '';
         
         if (!player.cards || player.cards.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #c9e4c5;">Caricamento cartelle...</p>';
+            container.innerHTML = '<p style="text-align: center; color: #c9e4c5; padding: 20px;">Caricamento cartelle...</p>';
             return;
         }
         
@@ -299,7 +369,10 @@ document.addEventListener('DOMContentLoaded', function() {
             cardElement.innerHTML = `
                 <h3><i class="fas fa-table"></i> Cartella ${cardIndex + 1}</h3>
                 <div class="tombola-sheet" id="card-${cardIndex}">
-                    <!-- I numeri della cartella appariranno qui in griglia 3x9 -->
+                    <!-- La griglia verrà popolata da initCardGrid -->
+                </div>
+                <div class="row-counters" id="row-counters-${cardIndex}">
+                    <!-- I contatori per riga verranno aggiunti qui -->
                 </div>
                 <div style="margin-top: 15px; text-align: center;">
                     <span style="color: #c9e4c5;">Numeri segnati: </span>
@@ -312,54 +385,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Funzione per inizializzare la griglia 3x9 di una cartella CORRETTAMENTE
+    // Funzione per inizializzare la griglia di una cartella
     function initCardGrid(cardIndex) {
         const grid = document.getElementById(`card-${cardIndex}`);
+        if (!grid) return;
+        
         grid.innerHTML = '';
         
-        if (!player.cards[cardIndex]) return;
+        if (!player.cards[cardIndex] || !player.cards[cardIndex].rows) {
+            grid.innerHTML = '<div style="grid-column: span 9; text-align: center; color: #c9e4c5;">Errore nel caricamento</div>';
+            return;
+        }
         
-        // Creiamo una griglia 3x9 vuota
-        const gridCells = Array(3).fill().map(() => Array(9).fill(null));
+        const cardData = player.cards[cardIndex];
         
-        // Per ogni numero nella cartella, troviamo la sua colonna corretta
-        player.cards[cardIndex].forEach(numObj => {
-            const num = numObj.number;
-            let column;
-            
-            // Determina la colonna in base al range del numero
-            if (num <= 9) column = 0;
-            else if (num <= 19) column = 1;
-            else if (num <= 29) column = 2;
-            else if (num <= 39) column = 3;
-            else if (num <= 49) column = 4;
-            else if (num <= 59) column = 5;
-            else if (num <= 69) column = 6;
-            else if (num <= 79) column = 7;
-            else column = 8; // 80-90
-            
-            // Trova la prima riga vuota in questa colonna
-            for (let row = 0; row < 3; row++) {
-                if (gridCells[row][column] === null) {
-                    gridCells[row][column] = {
-                        number: num,
-                        marked: numObj.marked
-                    };
-                    break;
-                }
-            }
-        });
-        
-        // Ora creiamo la griglia HTML
+        // Crea la griglia 3x9
         for (let row = 0; row < 3; row++) {
             for (let col = 0; col < 9; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'sheet-cell';
                 
-                const cellData = gridCells[row][col];
+                const cellData = cardData.rows[row][col];
                 if (cellData) {
                     cell.textContent = cellData.number;
                     cell.id = `card-${cardIndex}-num-${cellData.number}`;
+                    
                     if (cellData.marked) {
                         cell.classList.add('marked');
                     }
@@ -372,17 +422,94 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Aggiungi contatori per riga
+        addRowCounters(cardIndex);
         updateCardCount(cardIndex);
     }
     
-    // Funzione per aggiornare il conteggio
+    // Funzione per aggiungere i contatori per riga
+    function addRowCounters(cardIndex) {
+        const countersContainer = document.getElementById(`row-counters-${cardIndex}`);
+        if (!countersContainer) return;
+        
+        countersContainer.innerHTML = '';
+        
+        for (let row = 0; row < 3; row++) {
+            const counter = document.createElement('div');
+            counter.className = 'row-counter-item';
+            counter.innerHTML = `
+                <div class="row-counter-label">Riga ${row + 1}</div>
+                <div id="card-${cardIndex}-row-${row}" class="row-counter-value">0</div>
+                <div class="row-counter-max">/5</div>
+            `;
+            countersContainer.appendChild(counter);
+        }
+    }
+    
+    // Aggiorna tutti i display delle cartelle
+    function updateAllCardsDisplay() {
+        if (!player.cards) return;
+        
+        player.cards.forEach((card, cardIndex) => {
+            updateCardCount(cardIndex);
+        });
+    }
+    
+    // Aggiorna il conteggio per una cartella
     function updateCardCount(cardIndex) {
         if (!player.cards[cardIndex]) return;
         
-        const markedCount = player.cards[cardIndex].filter(num => num.marked).length;
+        const cardData = player.cards[cardIndex];
+        let totalMarked = 0;
+        const rowCounts = [0, 0, 0];
+        
+        // Aggiorna visualizzazione celle e conta
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 9; col++) {
+                const cellData = cardData.rows[row][col];
+                if (cellData) {
+                    const cell = document.getElementById(`card-${cardIndex}-num-${cellData.number}`);
+                    if (cell) {
+                        if (cellData.marked && !cell.classList.contains('marked')) {
+                            cell.classList.add('marked');
+                        } else if (!cellData.marked && cell.classList.contains('marked')) {
+                            cell.classList.remove('marked');
+                        }
+                    }
+                    
+                    if (cellData.marked) {
+                        totalMarked++;
+                        rowCounts[row]++;
+                    }
+                }
+            }
+        }
+        
+        // Aggiorna contatori
+        for (let row = 0; row < 3; row++) {
+            const rowCounter = document.getElementById(`card-${cardIndex}-row-${row}`);
+            if (rowCounter) {
+                rowCounter.textContent = rowCounts[row];
+                if (rowCounts[row] === 5) {
+                    rowCounter.style.color = '#ff9900';
+                    rowCounter.style.fontWeight = 'bold';
+                } else {
+                    rowCounter.style.color = '#ffcc00';
+                    rowCounter.style.fontWeight = 'normal';
+                }
+            }
+        }
+        
         const countElement = document.getElementById(`card-${cardIndex}-count`);
         if (countElement) {
-            countElement.textContent = markedCount;
+            countElement.textContent = totalMarked;
+            if (totalMarked === 15) {
+                countElement.style.color = '#ff0000';
+                countElement.style.fontWeight = 'bold';
+            } else {
+                countElement.style.color = '#ffcc00';
+                countElement.style.fontWeight = 'normal';
+            }
         }
     }
     
@@ -409,321 +536,60 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.className = `message ${type}`;
         messageDiv.style.display = 'block';
         
+        // Scrolla il messaggio in vista
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
         setTimeout(() => {
             messageDiv.style.display = 'none';
         }, 5000);
     }
     
-    // Aggiungi stili per l'animazione
+    // Aggiungi stili CSS
     const style = document.createElement('style');
     style.textContent = `
         @keyframes pulse {
-            0% { 
-                transform: scale(1);
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes winning-pulse {
+            0%, 100% { 
                 box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.7);
+                background: #009933;
             }
             50% { 
-                transform: scale(1.1);
-                box-shadow: 0 0 20px rgba(255, 204, 0, 0.9);
+                box-shadow: 0 0 15px rgba(255, 204, 0, 0.9);
+                background: #ffcc00;
+                color: #000;
             }
-            100% { 
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 204, 0, 0);
-            }
+        }
+        
+        .win-ambo { background: #4ecdc4 !important; }
+        .win-terna { background: #ff6b6b !important; }
+        .win-quaterna { background: #ffe66d !important; color: #000 !important; }
+        .win-cinquina { background: #ff9900 !important; }
+        
+        .card-complete {
+            border: 3px solid #ff0000 !important;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5) !important;
+            position: relative;
+        }
+        
+        .card-complete::before {
+            content: '🎉 TOMBOLA!';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff0000;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 10;
         }
     `;
     document.head.appendChild(style);
 });
-
-
-// Aggiungi queste funzioni al player.js:
-
-// Gestione rilevamento vincite
-function handleWinDetected(data) {
-    const winMessages = {
-        'ambo': 'Ambo! Hai fatto 2 numeri su una riga!',
-        'terna': 'Terna! Hai fatto 3 numeri su una riga!',
-        'quaterna': 'Quaterna! Hai fatto 4 numeri su una riga!',
-        'cinquina': 'Cinquina! Hai completato una riga intera!'
-    };
-    
-    if (winMessages[data.type]) {
-        showMessage(`🎉 ${winMessages[data.type]}`, 'success');
-        
-        // Effetto visivo sulla riga vincente
-        highlightWinningRow(data.cardIndex, data.row);
-    }
-}
-
-// Gestione cinquina di altri giocatori
-function handlePlayerCinquina(data) {
-    if (data.playerName !== player.name) {
-        showMessage(`🎉 ${data.playerName} ha fatto CINQUINA nella cartella ${data.cardIndex + 1}!`, 'info');
-    }
-}
-
-// Funzione per evidenziare la riga vincente
-function highlightWinningRow(cardIndex, rowIndex) {
-    const grid = document.getElementById(`card-${cardIndex}`);
-    if (!grid) return;
-    
-    const cells = grid.querySelectorAll('.sheet-cell');
-    // Ogni riga ha 9 celle, quindi:
-    const startIndex = rowIndex * 9;
-    const endIndex = startIndex + 9;
-    
-    for (let i = startIndex; i < endIndex; i++) {
-        if (cells[i] && !cells[i].classList.contains('empty')) {
-            cells[i].style.animation = 'winning-pulse 2s';
-            setTimeout(() => {
-                if (cells[i]) cells[i].style.animation = '';
-            }, 2000);
-        }
-    }
-}
-
-// Modifica la funzione initCardGrid per gestire la griglia 3x9 correttamente:
-function initCardGrid(cardIndex) {
-    const grid = document.getElementById(`card-${cardIndex}`);
-    if (!grid) return;
-    
-    grid.innerHTML = '';
-    
-    if (!player.cards[cardIndex] || !player.cards[cardIndex].rows) {
-        grid.innerHTML = '<div style="grid-column: span 9; text-align: center; color: #c9e4c5;">Caricamento...</div>';
-        return;
-    }
-    
-    const cardData = player.cards[cardIndex];
-    
-    // Crea la griglia 3x9
-    for (let row = 0; row < 3; row++) {
-        for (let col = 0; col < 9; col++) {
-            const cell = document.createElement('div');
-            cell.className = 'sheet-cell';
-            
-            const cellData = cardData.rows[row][col];
-            if (cellData) {
-                cell.textContent = cellData.number;
-                cell.id = `card-${cardIndex}-num-${cellData.number}`;
-                cell.dataset.row = row;
-                cell.dataset.col = col;
-                
-                if (cellData.marked) {
-                    cell.classList.add('marked');
-                }
-            } else {
-                cell.classList.add('empty');
-                cell.textContent = '';
-            }
-            
-            grid.appendChild(cell);
-        }
-    }
-    
-    // Aggiungi contatori per riga
-    addRowCounters(cardIndex);
-    updateCardCount(cardIndex);
-}
-
-// Funzione per aggiungere i contatori per riga
-function addRowCounters(cardIndex) {
-    const cardElement = document.querySelector(`#card-${cardIndex}`).closest('.tombola-card');
-    if (!cardElement) return;
-    
-    // Rimuovi contatori esistenti
-    const existingCounters = cardElement.querySelectorAll('.row-counter');
-    existingCounters.forEach(counter => counter.remove());
-    
-    // Crea contatori per ogni riga
-    const rowCounters = document.createElement('div');
-    rowCounters.style.display = 'flex';
-    rowCounters.style.justifyContent = 'space-around';
-    rowCounters.style.marginTop = '10px';
-    rowCounters.style.padding = '0 20px';
-    
-    for (let row = 0; row < 3; row++) {
-        const counter = document.createElement('div');
-        counter.className = 'row-counter';
-        counter.innerHTML = `
-            <div style="text-align: center;">
-                <div style="color: #c9e4c5; font-size: 0.8rem;">Riga ${row + 1}</div>
-                <div id="card-${cardIndex}-row-${row}-count" style="color: #ffcc00; font-weight: bold; font-size: 1.2rem;">0</div>
-                <div style="color: #c9e4c5; font-size: 0.7rem;">/5</div>
-            </div>
-        `;
-        rowCounters.appendChild(counter);
-    }
-    
-    cardElement.querySelector('.tombola-sheet').insertAdjacentElement('afterend', rowCounters);
-}
-
-// Aggiorna la funzione updateCardCount per contare anche per riga
-function updateCardCount(cardIndex) {
-    if (!player.cards[cardIndex]) return;
-    
-    const cardData = player.cards[cardIndex];
-    let totalMarked = 0;
-    const rowCounts = [0, 0, 0];
-    
-    // Conta numeri segnati totali e per riga
-    cardData.rows.forEach((row, rowIndex) => {
-        const markedInRow = row.filter(cell => cell && cell.marked).length;
-        rowCounts[rowIndex] = markedInRow;
-        totalMarked += markedInRow;
-        
-        // Aggiorna contatore riga
-        const rowCounter = document.getElementById(`card-${cardIndex}-row-${rowIndex}-count`);
-        if (rowCounter) {
-            rowCounter.textContent = markedInRow;
-            
-            // Evidenzia se la riga è completa (cinquina)
-            if (markedInRow === 5) {
-                rowCounter.style.color = '#ff0000';
-                rowCounter.style.fontWeight = 'bold';
-                rowCounter.innerHTML = `<span style="color: #ff0000;">${markedInRow} ✓</span>`;
-            }
-        }
-    });
-    
-    // Aggiorna contatore totale
-    const countElement = document.getElementById(`card-${cardIndex}-count`);
-    if (countElement) {
-        countElement.textContent = totalMarked;
-        
-        // Evidenzia se tombola (tutti i 15 numeri)
-        if (totalMarked === 15) {
-            countElement.style.color = '#ff0000';
-            countElement.style.fontWeight = 'bold';
-            countElement.innerHTML = `<span style="color: #ff0000;">${totalMarked} 🎉 TOMBOLA!</span>`;
-        }
-    }
-}
-
-// Modifica la funzione checkWinner per mostrare tutte le vincite
-function checkWinner() {
-    if (!player.isConnected) {
-        showMessage('Non sei connesso a una stanza', 'error');
-        return;
-    }
-    
-    let totalMarked = 0;
-    let winningCards = [];
-    let winningRows = {
-        ambo: [],
-        terna: [],
-        quaterna: [],
-        cinquina: [],
-        tombola: []
-    };
-    
-    player.cards.forEach((card, cardIndex) => {
-        const cardData = player.cards[cardIndex];
-        if (!cardData || !cardData.rows) return;
-        
-        let cardMarked = 0;
-        
-        // Controlla ogni riga
-        cardData.rows.forEach((row, rowIndex) => {
-            const markedInRow = row.filter(cell => cell && cell.marked).length;
-            cardMarked += markedInRow;
-            
-            // Rileva le vincite per riga
-            if (markedInRow >= 2) {
-                if (markedInRow === 2) {
-                    winningRows.ambo.push({ card: cardIndex + 1, row: rowIndex + 1 });
-                }
-                if (markedInRow === 3) {
-                    winningRows.terna.push({ card: cardIndex + 1, row: rowIndex + 1 });
-                }
-                if (markedInRow === 4) {
-                    winningRows.quaterna.push({ card: cardIndex + 1, row: rowIndex + 1 });
-                }
-                if (markedInRow === 5) {
-                    winningRows.cinquina.push({ card: cardIndex + 1, row: rowIndex + 1 });
-                }
-            }
-        });
-        
-        totalMarked += cardMarked;
-        
-        // Controlla tombola (tutta la cartella)
-        if (cardMarked === 15) {
-            winningRows.tombola.push(cardIndex + 1);
-            winningCards.push(cardIndex + 1);
-        }
-    });
-    
-    const totalNumbers = 15 * player.cardsCount;
-    
-    // Crea messaggio con tutte le vincite
-    let winMessage = '';
-    
-    if (winningRows.tombola.length > 0) {
-        winMessage += `🎉 TOMBOLA! Hai completato le cartelle: ${winningRows.tombola.join(', ')}!\n`;
-    }
-    
-    if (winningRows.cinquina.length > 0) {
-        winMessage += `🎯 Cinquina nelle cartelle: ${winningRows.cinquina.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
-    }
-    
-    if (winningRows.quaterna.length > 0) {
-        winMessage += `⭐ Quaterna nelle cartelle: ${winningRows.quaterna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
-    }
-    
-    if (winningRows.terna.length > 0) {
-        winMessage += `🔶 Terna nelle cartelle: ${winningRows.terna.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
-    }
-    
-    if (winningRows.ambo.length > 0) {
-        winMessage += `🔹 Ambo nelle cartelle: ${winningRows.ambo.map(w => `C${w.card}R${w.row}`).join(', ')}\n`;
-    }
-    
-    if (winMessage) {
-        showMessage(winMessage, 'success');
-        
-        // Effetto speciale per vincite importanti
-        if (winningRows.tombola.length > 0 || winningRows.cinquina.length > 0) {
-            document.getElementById('game-section').style.animation = 'pulse 1s infinite';
-            setTimeout(() => {
-                document.getElementById('game-section').style.animation = '';
-            }, 5000);
-        }
-    } else {
-        showMessage(`Hai segnato ${totalMarked} numeri su ${totalNumbers}. Continua così!`, 'info');
-    }
-}
-
-// Aggiungi questo stile CSS per le animazioni
-const winStyle = document.createElement('style');
-winStyle.textContent = `
-    @keyframes winning-pulse {
-        0%, 100% { 
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
-        }
-        50% { 
-            transform: scale(1.1);
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.9);
-            background: linear-gradient(135deg, #ffd700, #ffed4e);
-        }
-    }
-    
-    .sheet-cell.marked.winning {
-        background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
-        color: #000 !important;
-        font-weight: bold;
-        animation: winning-pulse 2s infinite;
-    }
-    
-    .row-counter div:first-child {
-        font-size: 0.8rem;
-        margin-bottom: 2px;
-    }
-    
-    .row-counter div:nth-child(2) {
-        font-size: 1.3rem;
-        font-weight: bold;
-    }
-`;
-document.head.appendChild(winStyle);
