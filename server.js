@@ -30,33 +30,21 @@ function generateId(length = 6) {
 }
 
 // Route per le pagine
-
-// Aggiungi questa route al server.js esistente
-
-// API per ottenere stanze attive
-app.get('/api/active-rooms', (req, res) => {
-    const activeRooms = Array.from(rooms.values())
-        .filter(room => room.isActive && room.players.size > 0)
-        .map(room => ({
-            id: room.id,
-            name: room.name,
-            players: room.players.size,
-            maxPlayers: room.maxPlayers,
-            createdAt: room.createdAt
-        }));
-    
-    res.json(activeRooms);
-});
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get('/admin-login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-login.html'));
+});
+
+app.get('/admin.html', (req, res) => {
+    // In una app reale, qui controlleresti l'autenticazione
+    // Per semplicità, permettiamo l'accesso diretto
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-app.get('/player', (req, res) => {
+app.get('/player.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'player.html'));
 });
 
@@ -65,7 +53,11 @@ app.post('/api/admin/login', (req, res) => {
     const { email, password } = req.body;
     
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        res.json({ success: true, token: 'admin-token' });
+        res.json({ 
+            success: true, 
+            token: 'admin-token',
+            user: { email, role: 'admin' }
+        });
     } else {
         res.status(401).json({ success: false, error: 'Credenziali non valide' });
     }
@@ -90,6 +82,21 @@ app.get('/api/room/:code', (req, res) => {
     }
 });
 
+// API per ottenere stanze attive
+app.get('/api/active-rooms', (req, res) => {
+    const activeRooms = Array.from(rooms.values())
+        .filter(room => room.isActive && room.players.size > 0)
+        .map(room => ({
+            id: room.id,
+            name: room.name,
+            players: room.players.size,
+            maxPlayers: room.maxPlayers,
+            createdAt: room.createdAt
+        }));
+    
+    res.json(activeRooms);
+});
+
 // WebSocket
 io.on('connection', (socket) => {
     console.log('Nuova connessione:', socket.id);
@@ -109,13 +116,16 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // Genera le cartelle per il giocatore
+        const cards = generateCards(cardsCount);
+        
         // Crea il giocatore
         const player = {
             id: socket.id,
             name: playerName,
             roomCode,
             cardsCount,
-            cards: generateCards(cardsCount),
+            cards: cards,
             markedCount: 0,
             socketId: socket.id,
             joinedAt: new Date().toISOString()
@@ -137,6 +147,7 @@ io.on('connection', (socket) => {
                 cardsCount: p.cardsCount,
                 markedCount: p.markedCount
             })),
+            cards: cards, // Invia le cartelle generate
             extractedNumbers: room.extractedNumbers,
             lastNumber: room.lastNumber
         });
@@ -344,24 +355,85 @@ io.on('connection', (socket) => {
     });
 });
 
-// Funzioni helper
+// Funzioni helper per generare cartelle corrette 3x9
 function generateCards(count) {
     const cards = [];
     
     for (let i = 0; i < count; i++) {
-        const numbers = new Set();
-        while (numbers.size < 15) {
-            numbers.add(Math.floor(Math.random() * 90) + 1);
-        }
-        
-        const card = Array.from(numbers)
-            .sort((a, b) => a - b)
-            .map(num => ({ number: num, marked: false }));
-        
+        const card = generateTombolaCard();
         cards.push(card);
     }
     
     return cards;
+}
+
+function generateTombolaCard() {
+    // Una cartella tombola ha 15 numeri in una griglia 3x9
+    // Ogni riga ha 5 numeri, ogni colonna ha 1-3 numeri
+    // Colonne: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69, 70-79, 80-90
+    
+    const card = [];
+    const numbersByColumn = Array(9).fill().map(() => []);
+    
+    // Genera numeri per ogni colonna
+    for (let col = 0; col < 9; col++) {
+        const min = col * 10 + 1;
+        const max = col === 8 ? 90 : (col + 1) * 10;
+        const countInColumn = col < 8 ? 3 : 4; // L'ultima colonna ha 4 numeri (80-90)
+        
+        // Genera numeri unici per questa colonna
+        const columnNumbers = [];
+        while (columnNumbers.length < countInColumn) {
+            const num = Math.floor(Math.random() * (max - min + 1)) + min;
+            if (!columnNumbers.includes(num)) {
+                columnNumbers.push(num);
+            }
+        }
+        
+        // Ordina i numeri
+        columnNumbers.sort((a, b) => a - b);
+        numbersByColumn[col] = columnNumbers;
+    }
+    
+    // Distribuisci i numeri nelle 3 righe
+    const rows = [[], [], []];
+    
+    // Prima, riempi ogni riga con esattamente 5 numeri
+    for (let row = 0; row < 3; row++) {
+        // Conta quanti numeri deve avere questa riga
+        let numbersToAdd = 5;
+        
+        // Distribuisci i numeri dalle colonne
+        for (let col = 0; col < 9 && numbersToAdd > 0; col++) {
+            // Se questa colonna ha numeri da assegnare a questa riga
+            if (numbersByColumn[col].length > 0) {
+                const num = numbersByColumn[col].shift();
+                rows[row].push({
+                    number: num,
+                    column: col,
+                    marked: false
+                });
+                numbersToAdd--;
+            }
+        }
+    }
+    
+    // Ordina ogni riga per colonna
+    rows.forEach(row => {
+        row.sort((a, b) => a.column - b.column);
+    });
+    
+    // Combina tutte le righe in un'unica lista di numeri per la cartella
+    rows.forEach(row => {
+        row.forEach(cell => {
+            card.push({
+                number: cell.number,
+                marked: false
+            });
+        });
+    });
+    
+    return card;
 }
 
 function countMarkedNumbers(player) {
