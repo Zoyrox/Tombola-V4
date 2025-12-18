@@ -98,6 +98,25 @@ app.get('/api/active-rooms', (req, res) => {
     res.json(activeRooms);
 });
 
+
+// API per verificare se un numero è stato estratto in una stanza
+app.get('/api/room/:code/check-number/:number', (req, res) => {
+    const roomCode = req.params.code.toUpperCase();
+    const number = parseInt(req.params.number);
+    const room = rooms.get(roomCode);
+    
+    if (!room) {
+        return res.json({ exists: false, extracted: false });
+    }
+    
+    const extracted = room.extractedNumbers.includes(number);
+    res.json({
+        exists: true,
+        extracted: extracted,
+        lastNumber: room.lastNumber
+    });
+});
+
 // FUNZIONE PER GENERARE CARTELLE TOMBOLA CORRETTE (max 2 numeri per colonna)
 function generateTombolaCard() {
     // Una cartella tombola ha 15 numeri distribuiti in 3 righe e 9 colonne
