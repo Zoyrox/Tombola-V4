@@ -1,0 +1,433 @@
+/* Reset e stili base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #0f3b1e 0%, #1a5d2c 50%, #0f3b1e 100%);
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Contenitore neve */
+#snow-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Container principale */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+    z-index: 2;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-top: 20px;
+}
+
+.header h1 {
+    font-family: 'Mountains of Christmas', cursive;
+    font-size: 3.5rem;
+    color: #ffcc00;
+    text-shadow: 3px 3px 0 #d40000, 6px 6px 0 rgba(0, 0, 0, 0.2);
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #c9e4c5;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Bottoni */
+.btn {
+    display: inline-block;
+    padding: 14px 28px;
+    background: #d40000;
+    color: white;
+    text-decoration: none;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    box-shadow: 0 4px 0 #8b0000;
+    margin: 10px 5px;
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 0 #8b0000;
+    background: #ff0000;
+}
+
+.btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 0 #8b0000;
+}
+
+.btn-admin {
+    background: #ff9900;
+    box-shadow: 0 4px 0 #cc7a00;
+}
+
+.btn-admin:hover {
+    background: #ffad33;
+    box-shadow: 0 6px 0 #cc7a00;
+}
+
+.btn-player {
+    background: #009933;
+    box-shadow: 0 4px 0 #006622;
+}
+
+.btn-player:hover {
+    background: #00cc44;
+    box-shadow: 0 6px 0 #006622;
+}
+
+.btn-secondary {
+    background: #4a90e2;
+    box-shadow: 0 4px 0 #2c6cb0;
+}
+
+.btn-secondary:hover {
+    background: #6aa9f4;
+    box-shadow: 0 6px 0 #2c6cb0;
+}
+
+/* Card di benvenuto */
+.welcome-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.welcome-content {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 40px;
+    margin-bottom: 50px;
+}
+
+.welcome-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 30px;
+    width: 320px;
+    text-align: center;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease;
+}
+
+.welcome-card:hover {
+    transform: translateY(-10px);
+}
+
+.card-icon {
+    font-size: 4rem;
+    color: #ffcc00;
+    margin-bottom: 20px;
+}
+
+.welcome-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+    color: #ffcc00;
+}
+
+.welcome-card p {
+    color: #c9e4c5;
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+/* Istruzioni */
+.instructions {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 40px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    max-width: 900px;
+}
+
+.instructions h3 {
+    color: #ffcc00;
+    font-size: 1.8rem;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 25px;
+}
+
+.step {
+    text-align: center;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    background: #d40000;
+    color: white;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.step p {
+    color: #c9e4c5;
+    line-height: 1.5;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: #c9e4c5;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
+}
+
+.footer i {
+    color: #ff4d4d;
+    margin: 0 5px;
+}
+
+/* Form */
+.form-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 500px;
+    margin: 0 auto;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #ffcc00;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: white;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #ffcc00;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Messaggi di errore/successo */
+.message {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.error {
+    background: rgba(255, 0, 0, 0.2);
+    border: 1px solid rgba(255, 0, 0, 0.5);
+    color: #ff9999;
+}
+
+.success {
+    background: rgba(0, 255, 0, 0.2);
+    border: 1px solid rgba(0, 255, 0, 0.5);
+    color: #99ff99;
+}
+
+.info {
+    background: rgba(0, 150, 255, 0.2);
+    border: 1px solid rgba(0, 150, 255, 0.5);
+    color: #99ccff;
+}
+
+/* Pannello admin */
+.admin-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 30px;
+}
+
+.panel-section {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 15px;
+    padding: 25px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.panel-section h3 {
+    color: #ffcc00;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Tabella numeri estratti */
+.numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.number-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.number-cell.extracted {
+    background: #d40000;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    border-color: #ffcc00;
+}
+
+/* Scheda tombola */
+.tombola-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.tombola-card h3 {
+    color: #ffcc00;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.numbers-card {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.card-number {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.card-number:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.card-number.marked {
+    background: #009933;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.card-number.marked::after {
+    content: "✓";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.8rem;
+    color: #ffcc00;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 2.5rem;
+    }
+    
+    .admin-panel {
+        grid-template-columns: 1fr;
+    }
+    
+    .numbers-grid, .numbers-card {
+        grid-template-columns: repeat(5, 1fr);
+    }
+    
+    .welcome-content {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .steps {
+        grid-template-columns: 1fr;
+    }
+}
