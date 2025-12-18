@@ -21,7 +21,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'password123';
 const rooms = new Map();
 const players = new Map();
 
-// Storico vincite per stanza
+// Storico vincite per stanza - solo le prime vincite di ogni tipo
 const winHistory = new Map();
 
 // Funzione per generare ID unici
@@ -108,93 +108,81 @@ function generateTombolaCard() {
     
     const grid = Array(3).fill().map(() => Array(9).fill(null));
     
-    // Contatori per righe e colonne
-    const rowCounts = [0, 0, 0]; // Ogni riga deve avere esattamente 5 numeri
-    const colCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0]; // Ogni colonna può avere 1 o 2 numeri
+    // Inizializza contatori
+    const rowCounts = [0, 0, 0];
+    const colCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     
-    // Generiamo i 15 numeri
-    const numbers = [];
-    
-    // Prima determiniamo quali colonne avranno 2 numeri
-    // Dobbiamo avere 15 numeri totali, se ogni colonna avesse 1 numero avremmo solo 9 numeri
-    // Quindi 6 colonne devono avere 2 numeri e 3 colonne devono avere 1 numero (6*2 + 3*1 = 15)
-    const twoNumberCols = [];
-    while (twoNumberCols.length < 6) {
+    // Distribuzione: 6 colonne con 2 numeri, 3 colonne con 1 numero
+    const twoNumCols = [];
+    while (twoNumCols.length < 6) {
         const col = Math.floor(Math.random() * 9);
-        if (!twoNumberCols.includes(col)) {
-            twoNumberCols.push(col);
-            colCounts[col] = 2; // Questa colonna avrà 2 numeri
+        if (!twoNumCols.includes(col)) {
+            twoNumCols.push(col);
         }
     }
     
-    // Le altre colonne avranno 1 numero
+    // Imposta contatori colonne
     for (let col = 0; col < 9; col++) {
-        if (colCounts[col] === 0) {
-            colCounts[col] = 1;
-        }
+        colCounts[col] = twoNumCols.includes(col) ? 2 : 1;
     }
     
-    // Ora per ogni colonna, generiamo i numeri appropriati
+    // Per ogni colonna, genera i numeri
     for (let col = 0; col < 9; col++) {
-        const numbersInCol = colCounts[col];
+        const numbersNeeded = colCounts[col];
         const min = col === 0 ? 1 : col * 10;
         const max = col === 8 ? 90 : (col + 1) * 10 - 1;
         
         // Genera numeri unici per questa colonna
         const colNumbers = [];
-        while (colNumbers.length < numbersInCol) {
+        while (colNumbers.length < numbersNeeded) {
             const num = Math.floor(Math.random() * (max - min + 1)) + min;
             if (!colNumbers.includes(num)) {
                 colNumbers.push(num);
-                numbers.push(num);
             }
         }
         
-        // Ordina i numeri
         colNumbers.sort((a, b) => a - b);
         
-        // Distribuisci i numeri nelle righe per questa colonna
-        // Scegli le righe casualmente ma rispettando i limiti (max 5 numeri per riga)
+        // Distribuisci nelle righe
         const availableRows = [0, 1, 2];
         
-        // Per il primo numero della colonna
-        if (numbersInCol >= 1) {
+        for (let i = 0; i < numbersNeeded; i++) {
+            // Trova una riga con meno di 5 numeri
             let row;
+            let attempts = 0;
             do {
                 row = availableRows[Math.floor(Math.random() * availableRows.length)];
-            } while (rowCounts[row] >= 5);
+                attempts++;
+                if (attempts > 10) {
+                    // Fallback: trova qualsiasi riga con spazio
+                    for (let r = 0; r < 3; r++) {
+                        if (rowCounts[r] < 5 && !grid[r][col]) {
+                            row = r;
+                            break;
+                        }
+                    }
+                }
+            } while (rowCounts[row] >= 5 || grid[row][col]);
             
-            grid[row][col] = { number: colNumbers[0], marked: false };
+            grid[row][col] = { number: colNumbers[i], marked: false };
             rowCounts[row]++;
             
-            // Rimuovi questa riga dalle disponibili per evitare di mettere entrambi i numeri nella stessa riga
-            // (non obbligatorio ma meglio per distribuzione)
+            // Rimuovi questa riga dalle disponibili per questa colonna
             const index = availableRows.indexOf(row);
             if (index > -1) availableRows.splice(index, 1);
         }
-        
-        // Per il secondo numero della colonna (se presente)
-        if (numbersInCol >= 2) {
-            let row;
-            do {
-                row = availableRows[Math.floor(Math.random() * availableRows.length)];
-            } while (rowCounts[row] >= 5);
-            
-            grid[row][col] = { number: colNumbers[1], marked: false };
-            rowCounts[row]++;
-        }
     }
     
-    // Verifica che ogni riga abbia esattamente 5 numeri
-    // Se non è così, sistemiamo
+    // Controlla e sistema distribuzione
     for (let row = 0; row < 3; row++) {
         while (rowCounts[row] < 5) {
-            // Trova una riga con più di 5 numeri e sposta qui
-            for (let otherRow = 0; otherRow < 3; otherRow++) {
-                if (rowCounts[otherRow] > 5 && row !== otherRow) {
-                    // Trova una colonna dove questa riga ha un numero e l'altra no
-                    for (let col = 0; col < 9; col++) {
-                        if (grid[otherRow][col] && !grid[row][col]) {
+            // Trova una colonna dove questa riga non ha numero e un'altra riga ne ha due
+            for (let col = 0; col < 9; col++) {
+                if (!grid[row][col]) {
+                    // Cerca una riga che ha un numero in questa colonna e ha più di 5 numeri
+                    for (let otherRow = 0; otherRow < 3; otherRow++) {
+                        if (otherRow !== row && grid[otherRow][col] && rowCounts[otherRow] > 5) {
+                            // Sposta il numero
                             grid[row][col] = grid[otherRow][col];
                             grid[otherRow][col] = null;
                             rowCounts[row]++;
@@ -202,7 +190,7 @@ function generateTombolaCard() {
                             break;
                         }
                     }
-                    break;
+                    if (rowCounts[row] === 5) break;
                 }
             }
         }
@@ -246,28 +234,45 @@ function countMarkedNumbers(player) {
     return total;
 }
 
-// Funzione per registrare una vincita nello storico
+// Controlla se una vincita di un certo tipo è già stata fatta nella stanza
+function hasWinTypeBeenMade(roomCode, winType, rowIndex = null) {
+    const history = winHistory.get(roomCode);
+    if (!history) return false;
+    
+    return history.some(win => {
+        if (win.type !== winType) return false;
+        // Per ambo/terna/quaterna/cinquina, controlla anche la riga
+        if (rowIndex !== null && win.rowIndex !== rowIndex) return false;
+        return true;
+    });
+}
+
+// Registra una vincita (solo se è la prima di quel tipo)
 function recordWin(roomCode, winData) {
     if (!winHistory.has(roomCode)) {
         winHistory.set(roomCode, []);
     }
     
     const history = winHistory.get(roomCode);
-    winData.timestamp = new Date().toISOString();
-    history.push(winData);
     
-    // Mantieni solo le ultime 50 vincite
-    if (history.length > 50) {
-        history.shift();
+    // Controlla se questa vincita è già stata fatta
+    const alreadyMade = hasWinTypeBeenMade(roomCode, winData.type, winData.rowIndex);
+    
+    if (!alreadyMade) {
+        winData.timestamp = new Date().toISOString();
+        history.push(winData);
+        return true; // Vincita registrata
     }
+    
+    return false; // Vincita già fatta
 }
 
 // Controlla vincite per un giocatore
 function checkWinsForPlayer(player, roomCode, newNumber) {
-    const wins = [];
+    const newWins = [];
     
     player.cards.forEach((card, cardIndex) => {
-        // Controlla ogni riga
+        // Controlla ogni riga per ambo/terna/quaterna/cinquina
         card.rows.forEach((row, rowIndex) => {
             const markedInRow = row.filter(cell => cell && cell.marked).length;
             
@@ -279,25 +284,23 @@ function checkWinsForPlayer(player, roomCode, newNumber) {
                     5: 'cinquina'
                 };
                 
-                if (winTypes[markedInRow]) {
-                    // Controlla se questa vincita è già stata registrata per questa riga
-                    const winKey = `${player.id}-${cardIndex}-${rowIndex}-${winTypes[markedInRow]}`;
-                    if (!player.winHistory) player.winHistory = new Set();
-                    
-                    if (!player.winHistory.has(winKey)) {
-                        player.winHistory.add(winKey);
-                        
+                const winType = winTypes[markedInRow];
+                if (winType) {
+                    // Controlla se questa vincita (tipo + riga) è già stata fatta
+                    if (!hasWinTypeBeenMade(roomCode, winType, rowIndex)) {
                         const winData = {
                             playerName: player.name,
                             playerId: player.id,
-                            type: winTypes[markedInRow],
+                            type: winType,
                             cardIndex: cardIndex,
                             rowIndex: rowIndex,
                             number: newNumber
                         };
                         
-                        wins.push(winData);
-                        recordWin(roomCode, winData);
+                        // Registra la vincita
+                        if (recordWin(roomCode, winData)) {
+                            newWins.push(winData);
+                        }
                     }
                 }
             }
@@ -306,10 +309,8 @@ function checkWinsForPlayer(player, roomCode, newNumber) {
         // Controlla tombola (tutta la cartella)
         const totalMarked = card.numbers.filter(num => num.marked).length;
         if (totalMarked === 15) {
-            const winKey = `${player.id}-${cardIndex}-tombola`;
-            if (!player.winHistory.has(winKey)) {
-                player.winHistory.add(winKey);
-                
+            // Controlla se tombola è già stata fatta
+            if (!hasWinTypeBeenMade(roomCode, 'tombola')) {
                 const winData = {
                     playerName: player.name,
                     playerId: player.id,
@@ -318,13 +319,14 @@ function checkWinsForPlayer(player, roomCode, newNumber) {
                     number: newNumber
                 };
                 
-                wins.push(winData);
-                recordWin(roomCode, winData);
+                if (recordWin(roomCode, winData)) {
+                    newWins.push(winData);
+                }
             }
         }
     });
     
-    return wins;
+    return newWins;
 }
 
 // WebSocket
@@ -358,8 +360,7 @@ io.on('connection', (socket) => {
             cards: cards,
             markedCount: 0,
             socketId: socket.id,
-            joinedAt: new Date().toISOString(),
-            winHistory: new Set()
+            joinedAt: new Date().toISOString()
         };
         
         // Aggiungi alla stanza
@@ -374,7 +375,7 @@ io.on('connection', (socket) => {
         // Unisciti alla room socket
         socket.join(roomCode);
         
-        // Invia dati al giocatore
+        // Invia dati al giocatore (SOLO numero corrente, non tutti i numeri estratti)
         socket.emit('joined-room', {
             roomName: room.name,
             players: Array.from(room.players.values()).map(p => ({
@@ -384,7 +385,6 @@ io.on('connection', (socket) => {
                 markedCount: p.markedCount
             })),
             cards: cards,
-            extractedNumbers: room.extractedNumbers,
             lastNumber: room.lastNumber,
             winHistory: winHistory.get(roomCode) || []
         });
@@ -399,7 +399,8 @@ io.on('connection', (socket) => {
         // Aggiorna admin
         io.to(`admin-${roomCode}`).emit('room-update', {
             players: Array.from(room.players.values()),
-            extractedNumbers: room.extractedNumbers.length
+            extractedNumbers: room.extractedNumbers.length,
+            winHistory: winHistory.get(roomCode) || []
         });
         
         console.log(`Giocatore ${playerName} si è unito alla stanza ${roomCode}`);
@@ -493,44 +494,35 @@ io.on('connection', (socket) => {
             allWins.push(...playerWins);
         });
         
-        // Invia a tutti nella stanza
+        // Invia a tutti nella stanza SOLO il numero corrente
         io.to(roomCode).emit('number-extracted', {
             number: newNumber,
-            extractedCount: room.extractedNumbers.length,
-            extractedNumbers: room.extractedNumbers
+            extractedCount: room.extractedNumbers.length
         });
         
-        // Notifica vincite
+        // Notifica vincite (solo quelle nuove)
         allWins.forEach(win => {
             if (win.type === 'tombola') {
                 io.to(roomCode).emit('player-won', win);
                 io.to(`admin-${roomCode}`).emit('player-won', win);
             } else {
-                // Per ambo/terna/quaterna/cinquina, invia solo al giocatore e admin
-                io.to(win.playerId).emit('win-detected', win);
+                // Per ambo/terna/quaterna/cinquina, notifica tutti
+                io.to(roomCode).emit('win-detected', win);
                 io.to(`admin-${roomCode}`).emit('win-detected', win);
-                
-                // Se è cinquina, notifica anche gli altri giocatori
-                if (win.type === 'cinquina') {
-                    socket.to(roomCode).emit('player-cinquina', {
-                        playerName: win.playerName,
-                        cardIndex: win.cardIndex,
-                        row: win.rowIndex + 1
-                    });
-                }
             }
         });
         
-        // Aggiorna admin con il numero estratto
+        // Aggiorna admin con il numero estratto e storico vincite
         io.to(`admin-${roomCode}`).emit('number-extracted-admin', {
             number: newNumber,
-            extractedNumbers: room.extractedNumbers
+            extractedNumbers: room.extractedNumbers,
+            winHistory: winHistory.get(roomCode) || []
         });
         
         console.log(`Numero ${newNumber} estratto nella stanza ${roomCode}`);
     });
     
-    // Giocatore segna manualmente un numero (doppio click per sicurezza)
+    // Giocatore segna manualmente un numero
     socket.on('mark-number-manual', (data) => {
         const { roomCode, cardIndex, number } = data;
         const player = players.get(socket.id);
@@ -559,22 +551,14 @@ io.on('connection', (socket) => {
             // Controlla vincite
             const wins = checkWinsForPlayer(player, roomCode, number);
             
-            // Notifica vincite
+            // Notifica vincite (solo quelle nuove)
             wins.forEach(win => {
                 if (win.type === 'tombola') {
                     io.to(roomCode).emit('player-won', win);
                     io.to(`admin-${roomCode}`).emit('player-won', win);
                 } else {
-                    socket.emit('win-detected', win);
+                    io.to(roomCode).emit('win-detected', win);
                     io.to(`admin-${roomCode}`).emit('win-detected', win);
-                    
-                    if (win.type === 'cinquina') {
-                        socket.to(roomCode).emit('player-cinquina', {
-                            playerName: win.playerName,
-                            cardIndex: win.cardIndex,
-                            row: win.rowIndex + 1
-                        });
-                    }
                 }
             });
             
@@ -601,7 +585,6 @@ io.on('connection', (socket) => {
                 card.numbers.forEach(num => num.marked = false);
             });
             player.markedCount = 0;
-            player.winHistory = new Set();
         });
         
         // Resetta storico vincite
@@ -609,7 +592,9 @@ io.on('connection', (socket) => {
         
         // Notifica a tutti
         io.to(roomCode).emit('extraction-reset');
-        io.to(`admin-${roomCode}`).emit('extraction-reset-admin');
+        io.to(`admin-${roomCode}`).emit('extraction-reset-admin', {
+            winHistory: []
+        });
     });
     
     // Disconnessione
@@ -629,7 +614,8 @@ io.on('connection', (socket) => {
                 // Aggiorna admin
                 io.to(`admin-${player.roomCode}`).emit('room-update', {
                     players: Array.from(room.players.values()),
-                    extractedNumbers: room.extractedNumbers.length
+                    extractedNumbers: room.extractedNumbers.length,
+                    winHistory: winHistory.get(roomCode) || []
                 });
             }
             players.delete(socket.id);
