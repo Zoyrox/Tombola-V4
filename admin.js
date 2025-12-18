@@ -1,4 +1,4 @@
-// Admin Tombola Natalizia
+// Admin Tombola Natalizia - Con effetto lampeggiante per i numeri
 document.addEventListener('DOMContentLoaded', function() {
     // Imposta anno corrente
     document.getElementById('current-year').textContent = new Date().getFullYear();
@@ -7,25 +7,21 @@ document.addEventListener('DOMContentLoaded', function() {
     let socket = io();
     let currentRoom = null;
     let extractedNumbers = [];
+    let lastExtractedNumber = null;
     let autoExtractInterval = null;
     let players = [];
     
     // Elementi DOM
-    const loginSection = document.getElementById('login-section');
     const adminPanel = document.getElementById('admin-panel');
     const messageDiv = document.getElementById('message');
-    const loginBtn = document.getElementById('login-btn');
     const createRoomBtn = document.getElementById('create-room-btn');
     const extractBtn = document.getElementById('extract-btn');
     const resetExtractionBtn = document.getElementById('reset-extraction-btn');
     const autoExtractBtn = document.getElementById('auto-extract-btn');
     const copyCodeBtn = document.getElementById('copy-code-btn');
     
-    // Inizializza la griglia dei numeri
+    // Inizializza la griglia dei numeri divisa per decine
     initNumbersGrid();
-    
-    // Gestione login
-    loginBtn.addEventListener('click', handleLogin);
     
     // Gestione creazione stanza
     createRoomBtn.addEventListener('click', createRoom);
@@ -38,11 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestione copia codice
     copyCodeBtn.addEventListener('click', copyRoomCode);
     
-    // Login con Enter
-    document.getElementById('admin-password').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') handleLogin();
-    });
-    
     // Socket event handlers
     socket.on('room-created', handleRoomCreated);
     socket.on('number-extracted-admin', handleNumberExtracted);
@@ -50,38 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('player-updated', handlePlayerUpdated);
     socket.on('extraction-reset-admin', handleExtractionReset);
     socket.on('admin-room-data', handleAdminRoomData);
-    
-    // Funzione di login
-    async function handleLogin() {
-        const email = document.getElementById('admin-email').value;
-        const password = document.getElementById('admin-password').value;
-        
-        if (!email || !password) {
-            showMessage('Inserisci email e password', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                loginSection.style.display = 'none';
-                adminPanel.style.display = 'grid';
-                showMessage('Accesso effettuato con successo!', 'success');
-            } else {
-                showMessage('Credenziali non valide', 'error');
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            showMessage('Errore di connessione al server', 'error');
-        }
-    }
     
     // Funzione per creare una stanza
     function createRoom() {
@@ -111,6 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Reset estrazione
         extractedNumbers = [];
+        lastExtractedNumber = null;
         players = [];
         updateExtractedNumberDisplay('--');
         updateExtractedNumbersGrid();
@@ -130,15 +90,38 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        if (extractedNumbers.length >= 90) {
+            showMessage('Tutti i numeri sono già stati estratti!', 'info');
+            return;
+        }
+        
         socket.emit('extract-number', currentRoom.roomCode);
     }
     
-    // Gestione numero estratto
+    // Gestione numero estratto (con effetto lampeggiante)
     function handleNumberExtracted(data) {
+        // Rimuovi l'effetto lampeggiante dal numero precedente
+        if (lastExtractedNumber) {
+            const prevCell = document.getElementById(`number-${lastExtractedNumber}`);
+            if (prevCell) {
+                prevCell.classList.remove('just-extracted');
+                prevCell.classList.add('extracted');
+            }
+        }
+        
+        // Aggiorna i dati
         extractedNumbers = data.extractedNumbers;
+        lastExtractedNumber = data.number;
+        
+        // Aggiorna il display del numero corrente
         updateExtractedNumberDisplay(data.number);
-        updateExtractedNumbersGrid();
+        
+        // Aggiorna la griglia con effetto lampeggiante per il nuovo numero
+        updateExtractedNumbersGridWithEffect(data.number);
+        
+        // Aggiorna il progresso
         updateExtractionProgress();
+        
         showMessage(`Numero ${data.number} estratto!`, 'success');
     }
     
@@ -146,6 +129,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetExtraction() {
         if (!currentRoom) {
             showMessage('Crea prima una stanza!', 'error');
+            return;
+        }
+        
+        if (extractedNumbers.length === 0) {
+            showMessage('Non ci sono numeri estratti da resettare', 'info');
             return;
         }
         
@@ -157,6 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestione reset estrazione
     function handleExtractionReset() {
         extractedNumbers = [];
+        lastExtractedNumber = null;
         updateExtractedNumberDisplay('--');
         updateExtractedNumbersGrid();
         updateExtractionProgress();
@@ -203,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleAdminRoomData(data) {
         players = data.players || [];
         extractedNumbers = data.extractedNumbers || [];
+        lastExtractedNumber = data.lastNumber;
         updateExtractedNumbersGrid();
         updateExtractionProgress();
         updatePlayersList();
@@ -238,39 +228,95 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     }
     
+    // Funzione per inizializzare la griglia divisa per decine
     function initNumbersGrid() {
         const grid = document.getElementById('extracted-numbers');
         grid.innerHTML = '';
         
-        for (let i = 1; i <= 90; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'number-cell';
-            cell.id = `number-${i}`;
-            cell.textContent = i;
-            grid.appendChild(cell);
+        // Aggiungi header per decine
+        for (let decade = 0; decade < 9; decade++) {
+            const header = document.createElement('div');
+            header.className = 'decade-header';
+            header.textContent = `${decade}1-${decade+1}0`;
+            if (decade === 8) header.textContent = '81-90';
+            grid.appendChild(header);
+            
+            // Aggiungi celle per questa decade
+            const start = decade * 10 + 1;
+            const end = decade === 8 ? 90 : (decade + 1) * 10;
+            
+            for (let i = start; i <= end; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'extracted-cell';
+                cell.id = `number-${i}`;
+                cell.textContent = i;
+                grid.appendChild(cell);
+            }
+            
+            // Aggiungi celle vuote se necessario per completare la riga
+            if (decade === 8) {
+                for (let i = 91; i <= 100; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'extracted-cell empty';
+                    grid.appendChild(cell);
+                }
+            }
         }
     }
     
+    // Aggiorna il display del numero estratto
     function updateExtractedNumberDisplay(number) {
         const display = document.getElementById('extracted-number');
         display.textContent = number;
         
+        // Effetto animazione
         display.style.transform = 'scale(1.2)';
         setTimeout(() => {
             display.style.transform = 'scale(1)';
         }, 300);
     }
     
-    function updateExtractedNumbersGrid() {
-        document.querySelectorAll('.number-cell').forEach(cell => {
-            cell.classList.remove('extracted');
+    // Aggiorna la griglia con effetto lampeggiante per il nuovo numero
+    function updateExtractedNumbersGridWithEffect(newNumber) {
+        // Rimuovi tutte le classi "extracted" e "just-extracted"
+        document.querySelectorAll('.extracted-cell').forEach(cell => {
+            cell.classList.remove('extracted', 'just-extracted');
         });
         
+        // Aggiungi la classe ai numeri estratti
         extractedNumbers.forEach(number => {
             const cell = document.getElementById(`number-${number}`);
-            if (cell) cell.classList.add('extracted');
+            if (cell) {
+                if (number === newNumber) {
+                    // Per il numero appena estratto, aggiungi l'effetto lampeggiante
+                    cell.classList.add('just-extracted');
+                } else {
+                    // Per i numeri estratti precedentemente, colore rosso fisso
+                    cell.classList.add('extracted');
+                }
+            }
         });
         
+        // Aggiorna il conteggio
+        document.getElementById('extracted-count').textContent = extractedNumbers.length;
+    }
+    
+    // Aggiorna la griglia normalmente (senza effetti speciali)
+    function updateExtractedNumbersGrid() {
+        // Rimuovi tutte le classi
+        document.querySelectorAll('.extracted-cell').forEach(cell => {
+            cell.classList.remove('extracted', 'just-extracted');
+        });
+        
+        // Aggiungi la classe ai numeri estratti
+        extractedNumbers.forEach(number => {
+            const cell = document.getElementById(`number-${number}`);
+            if (cell) {
+                cell.classList.add('extracted');
+            }
+        });
+        
+        // Aggiorna il conteggio
         document.getElementById('extracted-count').textContent = extractedNumbers.length;
     }
     
