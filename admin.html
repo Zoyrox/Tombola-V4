@@ -8,111 +8,194 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .access-denied {
+            text-align: center;
+            padding: 100px 20px;
+        }
+        
+        .access-denied i {
+            font-size: 5rem;
+            color: #ffcc00;
+            margin-bottom: 30px;
+        }
+        
+        .access-denied h1 {
+            color: #ffcc00;
+            margin-bottom: 20px;
+        }
+        
+        .access-denied p {
+            color: #c9e4c5;
+            margin-bottom: 30px;
+            font-size: 1.2rem;
+        }
+        
+        /* Stili per le caselle semplici */
+        .simple-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            margin-top: 15px;
+        }
+        
+        .simple-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.08);
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .simple-cell.extracted {
+            background: #d40000;
+            color: white;
+        }
+        
+        .simple-cell.just-extracted {
+            animation: flash 1s ease-in-out infinite;
+        }
+        
+        @keyframes flash {
+            0%, 100% { 
+                background: #d40000;
+                box-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
+            }
+            50% { 
+                background: #ffcc00;
+                box-shadow: 0 0 20px rgba(255, 204, 0, 1);
+            }
+        }
+    </style>
 </head>
 <body>
     <div id="snow-container"></div>
     
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-crown"></i> Pannello Amministratore</h1>
-            <p class="subtitle">Crea stanze, gestisci giocatori e estrai numeri in tempo reale</p>
-            <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">
-                <i class="fas fa-sign-out-alt"></i> Torna al Login
-            </a>
-        </div>
-        
-        <div id="admin-panel" class="admin-panel">
-            <div class="panel-section">
-                <h3><i class="fas fa-plus-circle"></i> Gestione Stanza</h3>
-                
-                <div class="form-group">
-                    <label for="room-name">Nome Stanza</label>
-                    <input type="text" id="room-name" class="form-control" placeholder="Es: Tombola di Natale 2023">
+    <div id="admin-content" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-crown"></i> Pannello Amministratore</h1>
+                <p class="subtitle">Crea stanze, gestisci giocatori e estrai numeri in tempo reale</p>
+                <div style="margin-top: 20px;">
+                    <a href="index.html" class="btn btn-secondary">
+                        <i class="fas fa-home"></i> Torna alla Home
+                    </a>
+                    <button id="logout-btn" class="btn btn-admin" style="margin-left: 10px;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+            
+            <div id="admin-panel" class="admin-panel">
+                <div class="panel-section">
+                    <h3><i class="fas fa-plus-circle"></i> Gestione Stanza</h3>
+                    
+                    <div class="form-group">
+                        <label for="room-name">Nome Stanza</label>
+                        <input type="text" id="room-name" class="form-control" placeholder="Es: Tombola di Natale">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="max-players">Numero Massimo Giocatori</label>
+                        <select id="max-players" class="form-control">
+                            <option value="10">10 giocatori</option>
+                            <option value="20" selected>20 giocatori</option>
+                            <option value="30">30 giocatori</option>
+                            <option value="50">50 giocatori</option>
+                        </select>
+                    </div>
+                    
+                    <button id="create-room-btn" class="btn btn-admin" style="width: 100%;">
+                        <i class="fas fa-plus"></i> Crea Nuova Stanza
+                    </button>
+                    
+                    <div id="room-info" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; display: none;">
+                        <h4 style="color: #ffcc00; margin-bottom: 10px;">
+                            <i class="fas fa-door-open"></i> Stanza Creata
+                        </h4>
+                        <p><strong>ID Stanza:</strong> <span id="room-id" style="color: #ffcc00; font-weight: bold;"></span></p>
+                        <p><strong>Nome:</strong> <span id="room-name-display"></span></p>
+                        <p><strong>Giocatori collegati:</strong> <span id="players-count">0</span></p>
+                        <p style="margin-top: 15px;">Condividi questo codice con i giocatori:</p>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <input type="text" id="room-code-share" class="form-control" readonly style="font-weight: bold; text-align: center;">
+                            <button id="copy-code-btn" class="btn btn-secondary">
+                                <i class="fas fa-copy"></i> Copia
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="max-players">Numero Massimo Giocatori</label>
-                    <select id="max-players" class="form-control">
-                        <option value="10">10 giocatori</option>
-                        <option value="20" selected>20 giocatori</option>
-                        <option value="30">30 giocatori</option>
-                        <option value="50">50 giocatori</option>
-                    </select>
-                </div>
-                
-                <button id="create-room-btn" class="btn btn-admin" style="width: 100%;">
-                    <i class="fas fa-plus"></i> Crea Nuova Stanza
-                </button>
-                
-                <div id="room-info" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; display: none;">
-                    <h4 style="color: #ffcc00; margin-bottom: 10px;">
-                        <i class="fas fa-door-open"></i> Stanza Creata
-                    </h4>
-                    <p><strong>ID Stanza:</strong> <span id="room-id" style="color: #ffcc00; font-weight: bold;"></span></p>
-                    <p><strong>Nome:</strong> <span id="room-name-display"></span></p>
-                    <p><strong>Giocatori collegati:</strong> <span id="players-count">0</span></p>
-                    <p style="margin-top: 15px;">Condividi questo codice con i giocatori:</p>
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <input type="text" id="room-code-share" class="form-control" readonly style="font-weight: bold; text-align: center;">
-                        <button id="copy-code-btn" class="btn btn-secondary">
-                            <i class="fas fa-copy"></i> Copia
+                <div class="panel-section">
+                    <h3><i class="fas fa-random"></i> Estrazione Numeri</h3>
+                    
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div id="extracted-number" style="font-size: 5rem; font-weight: bold; color: #ffcc00; text-shadow: 3px 3px 0 #d40000;">
+                            --
+                        </div>
+                        <p style="color: #c9e4c5;">Ultimo numero estratto</p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button id="extract-btn" class="btn btn-admin" style="flex: 1;">
+                            <i class="fas fa-dice"></i> Estrai Numero
+                        </button>
+                        <button id="reset-extraction-btn" class="btn btn-secondary" style="flex: 1;">
+                            <i class="fas fa-redo"></i> Reset Estrazione
                         </button>
                     </div>
-                </div>
-            </div>
-            
-            <div class="panel-section">
-                <h3><i class="fas fa-random"></i> Estrazione Numeri</h3>
-                
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <div id="extracted-number" style="font-size: 5rem; font-weight: bold; color: #ffcc00; text-shadow: 3px 3px 0 #d40000;">
-                        --
+                    
+                    <button id="auto-extract-btn" class="btn btn-player" style="width: 100%; margin-bottom: 10px;">
+                        <i class="fas fa-play"></i> Auto Estrazione (5s)
+                    </button>
+                    
+                    <div id="extraction-info" style="margin-top: 15px;">
+                        <p><strong>Numeri estratti:</strong> <span id="extracted-count">0</span>/90</p>
+                        <div class="progress-bar" style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 5px;">
+                            <div id="extraction-progress" style="height: 100%; background: #d40000; border-radius: 5px; width: 0%;"></div>
+                        </div>
                     </div>
-                    <p style="color: #c9e4c5;">Ultimo numero estratto</p>
                 </div>
                 
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <button id="extract-btn" class="btn btn-admin" style="flex: 1;">
-                        <i class="fas fa-dice"></i> Estrai Numero
-                    </button>
-                    <button id="reset-extraction-btn" class="btn btn-secondary" style="flex: 1;">
-                        <i class="fas fa-redo"></i> Reset Estrazione
-                    </button>
+                <div class="panel-section" style="grid-column: span 2;">
+                    <h3><i class="fas fa-list-ol"></i> Numeri Estratti</h3>
+                    <div id="extracted-numbers" class="simple-grid">
+                        <!-- I numeri estratti appariranno qui con caselle semplici -->
+                    </div>
+                    <div style="margin-top: 15px; text-align: center; color: #c9e4c5;">
+                        <p><i class="fas fa-info-circle"></i> Il numero appena estratto lampeggia in giallo</p>
+                    </div>
                 </div>
                 
-                <button id="auto-extract-btn" class="btn btn-player" style="width: 100%; margin-bottom: 10px;">
-                    <i class="fas fa-play"></i> Auto Estrazione (5s)
-                </button>
-                
-                <div id="extraction-info" style="margin-top: 15px;">
-                    <p><strong>Numeri estratti:</strong> <span id="extracted-count">0</span>/90</p>
-                    <div class="progress-bar" style="height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 5px;">
-                        <div id="extraction-progress" style="height: 100%; background: #d40000; border-radius: 5px; width: 0%;"></div>
+                <div class="panel-section" style="grid-column: span 2;">
+                    <h3><i class="fas fa-users"></i> Giocatori Connessi (<span id="players-total">0</span>)</h3>
+                    <div id="players-list">
+                        <p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>
                     </div>
                 </div>
             </div>
             
-            <div class="panel-section" style="grid-column: span 2;">
-                <h3><i class="fas fa-list-ol"></i> Numeri Estratti (Divisi per Decine)</h3>
-                <div id="extracted-numbers" class="extracted-numbers-grid">
-                    <!-- I numeri estratti appariranno qui divisi per decine -->
-                </div>
-                <div style="margin-top: 15px; text-align: center; color: #c9e4c5;">
-                    <p><i class="fas fa-info-circle"></i> Il numero appena estratto lampeggia in giallo, poi diventa rosso fisso</p>
-                </div>
-            </div>
-            
-            <div class="panel-section" style="grid-column: span 2;">
-                <h3><i class="fas fa-users"></i> Giocatori Connessi</h3>
-                <div id="players-list">
-                    <p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>
-                </div>
-            </div>
+            <footer class="footer">
+                <p>Pannello Amministratore Tombola Natalizia | <span id="current-year"></span></p>
+            </footer>
         </div>
-        
-        <footer class="footer">
-            <p>Pannello Amministratore Tombola Natalizia | <span id="current-year"></span></p>
-        </footer>
+    </div>
+    
+    <div id="access-denied" class="access-denied" style="display: none;">
+        <i class="fas fa-lock"></i>
+        <h1>Accesso Negato</h1>
+        <p>Devi effettuare il login per accedere al pannello amministratore</p>
+        <a href="admin-login.html" class="btn btn-admin">
+            <i class="fas fa-sign-in-alt"></i> Vai al Login
+        </a>
+        <div style="margin-top: 30px;">
+            <a href="index.html" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Torna alla Home
+            </a>
+        </div>
     </div>
     
     <script src="snow.js"></script>
