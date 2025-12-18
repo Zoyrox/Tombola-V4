@@ -1,5 +1,19 @@
-// Admin Tombola Natalizia - Con effetto lampeggiante per i numeri
+// Admin Tombola Natalizia - Con controllo accesso e caselle semplici
 document.addEventListener('DOMContentLoaded', function() {
+    // Controlla se l'utente è autenticato
+    const adminToken = localStorage.getItem('adminToken');
+    const adminContent = document.getElementById('admin-content');
+    const accessDenied = document.getElementById('access-denied');
+    
+    if (!adminToken) {
+        accessDenied.style.display = 'block';
+        adminContent.style.display = 'none';
+        return;
+    }
+    
+    // Se autenticato, mostra il pannello
+    adminContent.style.display = 'block';
+    
     // Imposta anno corrente
     document.getElementById('current-year').textContent = new Date().getFullYear();
     
@@ -12,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let players = [];
     
     // Elementi DOM
-    const adminPanel = document.getElementById('admin-panel');
+    const logoutBtn = document.getElementById('logout-btn');
     const messageDiv = document.getElementById('message');
     const createRoomBtn = document.getElementById('create-room-btn');
     const extractBtn = document.getElementById('extract-btn');
@@ -20,8 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const autoExtractBtn = document.getElementById('auto-extract-btn');
     const copyCodeBtn = document.getElementById('copy-code-btn');
     
-    // Inizializza la griglia dei numeri divisa per decine
-    initNumbersGrid();
+    // Inizializza la griglia semplice dei numeri
+    initSimpleNumbersGrid();
+    
+    // Gestione logout
+    logoutBtn.addEventListener('click', function() {
+        localStorage.removeItem('adminToken');
+        window.location.href = 'admin-login.html';
+    });
     
     // Gestione creazione stanza
     createRoomBtn.addEventListener('click', createRoom);
@@ -219,48 +239,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Funzioni di utilità
     function showMessage(text, type) {
-        messageDiv.textContent = text;
-        messageDiv.className = `message ${type}`;
-        messageDiv.style.display = 'block';
-        
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, 5000);
+        // Crea un div per il messaggio se non esiste
+        if (!messageDiv) {
+            const newMessageDiv = document.createElement('div');
+            newMessageDiv.id = 'message';
+            newMessageDiv.className = `message ${type}`;
+            newMessageDiv.textContent = text;
+            newMessageDiv.style.display = 'block';
+            document.querySelector('.container').insertBefore(newMessageDiv, document.getElementById('admin-panel'));
+            
+            setTimeout(() => {
+                newMessageDiv.remove();
+            }, 5000);
+        } else {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
     }
     
-    // Funzione per inizializzare la griglia divisa per decine
-    function initNumbersGrid() {
+    // Funzione per inizializzare la griglia semplice
+    function initSimpleNumbersGrid() {
         const grid = document.getElementById('extracted-numbers');
         grid.innerHTML = '';
         
-        // Aggiungi header per decine
-        for (let decade = 0; decade < 9; decade++) {
-            const header = document.createElement('div');
-            header.className = 'decade-header';
-            header.textContent = `${decade}1-${decade+1}0`;
-            if (decade === 8) header.textContent = '81-90';
-            grid.appendChild(header);
-            
-            // Aggiungi celle per questa decade
-            const start = decade * 10 + 1;
-            const end = decade === 8 ? 90 : (decade + 1) * 10;
-            
-            for (let i = start; i <= end; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'extracted-cell';
-                cell.id = `number-${i}`;
-                cell.textContent = i;
-                grid.appendChild(cell);
-            }
-            
-            // Aggiungi celle vuote se necessario per completare la riga
-            if (decade === 8) {
-                for (let i = 91; i <= 100; i++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'extracted-cell empty';
-                    grid.appendChild(cell);
-                }
-            }
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'simple-cell';
+            cell.id = `number-${i}`;
+            cell.textContent = i;
+            grid.appendChild(cell);
         }
     }
     
@@ -278,24 +290,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Aggiorna la griglia con effetto lampeggiante per il nuovo numero
     function updateExtractedNumbersGridWithEffect(newNumber) {
-        // Rimuovi tutte le classi "extracted" e "just-extracted"
-        document.querySelectorAll('.extracted-cell').forEach(cell => {
-            cell.classList.remove('extracted', 'just-extracted');
-        });
-        
-        // Aggiungi la classe ai numeri estratti
-        extractedNumbers.forEach(number => {
-            const cell = document.getElementById(`number-${number}`);
+        // Aggiorna tutte le celle
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.getElementById(`number-${i}`);
             if (cell) {
-                if (number === newNumber) {
-                    // Per il numero appena estratto, aggiungi l'effetto lampeggiante
-                    cell.classList.add('just-extracted');
-                } else {
-                    // Per i numeri estratti precedentemente, colore rosso fisso
-                    cell.classList.add('extracted');
+                cell.classList.remove('extracted', 'just-extracted');
+                
+                if (extractedNumbers.includes(i)) {
+                    if (i === newNumber) {
+                        // Per il numero appena estratto, aggiungi l'effetto lampeggiante
+                        cell.classList.add('just-extracted');
+                    } else {
+                        // Per i numeri estratti precedentemente, colore rosso fisso
+                        cell.classList.add('extracted');
+                    }
                 }
             }
-        });
+        }
         
         // Aggiorna il conteggio
         document.getElementById('extracted-count').textContent = extractedNumbers.length;
@@ -303,18 +314,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Aggiorna la griglia normalmente (senza effetti speciali)
     function updateExtractedNumbersGrid() {
-        // Rimuovi tutte le classi
-        document.querySelectorAll('.extracted-cell').forEach(cell => {
-            cell.classList.remove('extracted', 'just-extracted');
-        });
-        
-        // Aggiungi la classe ai numeri estratti
-        extractedNumbers.forEach(number => {
-            const cell = document.getElementById(`number-${number}`);
+        // Aggiorna tutte le celle
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.getElementById(`number-${i}`);
             if (cell) {
-                cell.classList.add('extracted');
+                cell.classList.remove('extracted', 'just-extracted');
+                
+                if (extractedNumbers.includes(i)) {
+                    cell.classList.add('extracted');
+                }
             }
-        });
+        }
         
         // Aggiorna il conteggio
         document.getElementById('extracted-count').textContent = extractedNumbers.length;
@@ -328,42 +338,46 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePlayersList() {
         const playersList = document.getElementById('players-list');
         const countElement = document.getElementById('players-count');
+        const totalElement = document.getElementById('players-total');
         
         if (players.length === 0) {
             playersList.innerHTML = '<p style="color: #c9e4c5; text-align: center;">Nessun giocatore connesso</p>';
             countElement.textContent = '0';
+            totalElement.textContent = '0';
             return;
         }
         
         playersList.innerHTML = '';
         countElement.textContent = players.length;
+        totalElement.textContent = players.length;
         
         players.forEach(player => {
             const playerElement = document.createElement('div');
-            playerElement.style.padding = '10px';
-            playerElement.style.marginBottom = '8px';
+            playerElement.style.padding = '12px';
+            playerElement.style.marginBottom = '10px';
             playerElement.style.background = 'rgba(255,255,255,0.05)';
             playerElement.style.borderRadius = '8px';
             playerElement.style.display = 'flex';
             playerElement.style.alignItems = 'center';
-            playerElement.style.gap = '10px';
+            playerElement.style.gap = '12px';
             
-            // Genera colore basato sull'ID
-            const hash = player.id.split('').reduce((acc, char) => {
-                return char.charCodeAt(0) + ((acc << 5) - acc);
-            }, 0);
-            const color = `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+            // Calcola percentuale di completamento
+            const totalNumbers = 15 * player.cardsCount;
+            const percentage = player.markedCount ? Math.round((player.markedCount / totalNumbers) * 100) : 0;
             
             playerElement.innerHTML = `
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: ${color}; display: flex; align-items: center; justify-content: center; color: white;">
+                <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #4ecdc4); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">
                     <i class="fas fa-user"></i>
                 </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: bold;">${player.name}</div>
-                    <div style="font-size: 0.8rem; color: #c9e4c5;">Cartelle: ${player.cardsCount}</div>
+                    <div style="font-weight: bold; font-size: 1.1rem;">${player.name}</div>
+                    <div style="font-size: 0.9rem; color: #c9e4c5;">
+                        <i class="fas fa-table"></i> ${player.cardsCount} cartella${player.cardsCount > 1 ? 'e' : ''}
+                    </div>
                 </div>
-                <div style="font-size: 0.9rem;">
-                    <span style="color: #ffcc00;">${player.markedCount || 0}</span>/${15 * player.cardsCount}
+                <div style="text-align: right;">
+                    <div style="font-size: 1.2rem; font-weight: bold; color: #ffcc00;">${player.markedCount || 0}</div>
+                    <div style="font-size: 0.8rem; color: #c9e4c5;">${percentage}%</div>
                 </div>
             `;
             
